@@ -4,7 +4,7 @@
 --## Constants ##--
 local STARTTIME = 6*TICRATE + (3*TICRATE/4)
 
-local SYNCBOOST_MAXDIST = 384*FRACUNIT
+local SYNCBOOST_MAXDIST = 448*FRACUNIT
 local SYNCBOOST_MAXBOOST = 3*TICRATE
 
 local INFO_MESSAGE_FADE_TIME = TICRATE*2
@@ -30,154 +30,83 @@ local RESETCOLOURSSTR = {"color", "color2", "color3", "color4"}
 --## Object definition ##--
 freeslot(
     "SPR_PAIR", "SPR_SYNC", "SPR_PARL",
-    "MT_PAIR_MARKER",
-    "S_PAIR_MARKER", "S_PAIR_MARKER_TRANS", "S_SYNC_MAXDIST",
-    "MT_SNEAKERGATE", "MT_INVINCGATE", "MT_GROWGATE", "MT_HYUDOROGATE",
-    "S_SNEAKERGATE", "S_INVINCGATE", "S_GROWGATE", "S_HYUDOROGATE"
+
+    "S_PAIR_POINTER", "MT_PAIR_POINTER"
+    "S_PAIR_MARKER", "S_PAIR_MARKER_TRANS", "MT_PAIR_MARKER",
+    "S_SYNC_MAXDIST", "MT_SYNC_MAXDIST",
+    "S_SNEAKERGATE", "MT_SNEAKERGATE",
+    "S_INVINCGATE", "MT_INVINCGATE",
+    "S_GROWGATE", "MT_GROWGATE",
+    "S_HYUDOROGATE", "MT_HYUDOROGATE"
 )
 
 
 states[S_PAIR_MARKER] = {SPR_PAIR, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_PAIR_MARKER}
 states[S_PAIR_MARKER_TRANS] = {SPR_PAIR, FF_FULLBRIGHT|TR_TRANS50|A, -1, nil, 0, 0, S_PAIR_MARKER}
 mobjinfo[MT_PAIR_MARKER] = {
-    doomednum = -1,
-    spawnstate = S_PAIR_MARKER,
-    spawnhealth = 1,
-    seestate = S_NULL,
-    seesound = sfx_None,
-    reactiontime = 0,
-    attacksound = sfx_None,
-    painstate = S_NULL,
-    painchance = 0,
-    painsound = sfx_None,
-    meleestate = S_NULL,
-    missilestate = S_NULL,
-    deathstate = S_NULL,
-    xdeathstate = S_NULL,
-    deathsound = sfx_itpick,
-    speed = 0,
+    spawnstate = S_PAIR_MARKER
+    spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    dispoffset = 0,
-    mass = 100,
-    damage = 0,
-    activesound = sfx_None,
     flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
-    raisestate = S_NULL
+}
+
+states[S_PAIR_POINTER] = {SPR_PLAY, FF_FULLBRIGHT|TR_TRANS50|A, -1, nil, 0, 0, S_PAIR_POINTER}
+mobjinfo[MT_PAIR_POINTER] = {
+    spawnstate = S_PAIR_POINTER,
+    spawnhealth = 1000,
+    radius = 32*FRACUNIT,
+    height = 32*FRACUNIT,
+    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_SYNC_MAXDIST] = {SPR_PARL, FF_FULLBRIGHT|FF_PAPERSPRITE|A, -1, nil, 0, 0, S_SYNC_MAXDIST}
+mobjinfo[MT_SYNC_MAXDIST] = {
+    spawnstate = S_SYNC_MAXDIST,
+    spawnhealth = 1000,
+    radius = 32*FRACUNIT,
+    height = 32*FRACUNIT,
+    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
+}
 
 states[S_SNEAKERGATE] = {SPR_ITEM, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|KITEM_SNEAKER, -1, nil, 0, 0, S_SNEAKERGATE}
 mobjinfo[MT_SNEAKERGATE] = {
-    doomednum = -1,
     spawnstate = S_SNEAKERGATE,
-    spawnhealth = 1,
-    seestate = S_NULL,
-    seesound = sfx_None,
-    reactiontime = 0,
-    attacksound = sfx_None,
-    painstate = S_NULL,
-    painchance = 0,
-    painsound = sfx_None,
-    meleestate = S_NULL,
-    missilestate = S_NULL,
-    deathstate = S_NULL,
-    xdeathstate = S_NULL,
+    spawnhealth = 1000,
     deathsound = sfx_itpick,
-    speed = 0,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    dispoffset = 0,
-    mass = 100,
-    damage = 0,
-    activesound = sfx_None,
     flags = MF_SPECIAL|MF_DONTENCOREMAP,
-    raisestate = S_NULL
 }
 
 states[S_INVINCGATE] = {SPR_ITMI, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|FF_ANIMATE|A, -1, nil, 3, 6, S_INVINCGATE}
 mobjinfo[MT_INVINCGATE] = {
-    doomednum = -1,
     spawnstate = S_INVINCGATE,
-    spawnhealth = 1,
-    seestate = S_NULL,
-    seesound = sfx_None,
-    reactiontime = 0,
-    attacksound = sfx_None,
-    painstate = S_NULL,
-    painchance = 0,
-    painsound = sfx_None,
-    meleestate = S_NULL,
-    missilestate = S_NULL,
-    deathstate = S_NULL,
-    xdeathstate = S_NULL,
+    spawnhealth = 1000,
     deathsound = sfx_itpick,
-    speed = 0,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    dispoffset = 0,
-    mass = 100,
-    damage = 0,
-    activesound = sfx_None,
     flags = MF_SPECIAL|MF_DONTENCOREMAP,
-    raisestate = S_NULL
 }
 
 states[S_GROWGATE] = {SPR_ITEM, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|KITEM_GROW, -1, nil, 0, 0, S_GROWGATE}
 mobjinfo[MT_GROWGATE] = {
-    doomednum = -1,
     spawnstate = S_GROWGATE,
-    spawnhealth = 1,
-    seestate = S_NULL,
-    seesound = sfx_None,
-    reactiontime = 0,
-    attacksound = sfx_None,
-    painstate = S_NULL,
-    painchance = 0,
-    painsound = sfx_None,
-    meleestate = S_NULL,
-    missilestate = S_NULL,
-    deathstate = S_NULL,
-    xdeathstate = S_NULL,
+    spawnhealth = 1000,
     deathsound = sfx_itpick,
-    speed = 0,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    dispoffset = 0,
-    mass = 100,
-    damage = 0,
-    activesound = sfx_None,
     flags = MF_SPECIAL|MF_DONTENCOREMAP,
-    raisestate = S_NULL
 }
 
 states[S_HYUDOROGATE] = {SPR_ITEM, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|KITEM_HYUDORO, -1, nil, 0, 0, S_HYUDOROGATE}
 mobjinfo[MT_HYUDOROGATE] = {
-    doomednum = -1,
     spawnstate = S_HYUDOROGATE,
-    spawnhealth = 1,
-    seestate = S_NULL,
-    seesound = sfx_None,
-    reactiontime = 0,
-    attacksound = sfx_None,
-    painstate = S_NULL,
-    painchance = 0,
-    painsound = sfx_None,
-    meleestate = S_NULL,
-    missilestate = S_NULL,
-    deathstate = S_NULL,
-    xdeathstate = S_NULL,
+    spawnhealth = 1000,
     deathsound = sfx_itpick,
-    speed = 0,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    dispoffset = 0,
-    mass = 100,
-    damage = 0,
-    activesound = sfx_None,
     flags = MF_SPECIAL|MF_DONTENCOREMAP,
-    raisestate = S_NULL
 }
 
 --## Rawsets ##--
@@ -740,8 +669,8 @@ local function think()
             end
             if not (pm.pairpointer and pm.pairpointer.valid) then
                 pm.pairpointer = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
-                pm.pairpointer.tics = -1
-                pm.pairpointer.scale = FRACUNIT/4
+                pm.pairpointer.scale = FRACUNIT/2
+                pm.pairpointer.state = S_PAIR_POINTER
             end
             
             if pm.pairpointer and pm.pairpointer.valid then -- sometimes the spawnmobj fails and everything would die
@@ -751,8 +680,10 @@ local function think()
                     P_TeleportMove(pm.pairpointer, p.mo.x + FixedMul(FixedMul(FixedMul(sin(ang+ANGLE_90), dist), FRACUNIT/64), p.mo.scale),
                                                    p.mo.y + FixedMul(FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), FRACUNIT/64), p.mo.scale),
                                                    p.mo.z + FixedMul(FixedMul(pm.pair.mo.z - p.mo.z, FRACUNIT/64), p.mo.scale))
-                    pm.pairpointer.scale = p.mo.scale/4
+                    pm.pairpointer.scale = p.mo.scale/2
                     pm.pairpointer.color = pm.pair.mo.color
+                    pm.pairpointer.skin = pm.pair.mo.skin
+                    pm.pairpointer.angle = pm.pair.frameangle
                     pm.pairpointer.flags2 = $&(~MF2_DONTDRAW)
                 else
                     pm.pairpointer.flags2 = $|MF2_DONTDRAW

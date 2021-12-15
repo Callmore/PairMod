@@ -31,9 +31,10 @@ local RESETCOLOURSSTR = {"color", "color2", "color3", "color4"}
 freeslot(
     "SPR_PAIR", "SPR_SYNC", "SPR_PARL",
 
-    "S_PAIR_POINTER", "MT_PAIR_POINTER"
+    "S_PAIR_POINTER", "MT_PAIR_POINTER",
     "S_PAIR_MARKER", "S_PAIR_MARKER_TRANS", "MT_PAIR_MARKER",
     "S_SYNC_MAXDIST", "MT_SYNC_MAXDIST",
+    "S_SYNCBOOST_INDICATOR_1", "S_SYNCBOOST_INDICATOR_2", "MT_SYNCBOOST_INDICATOR",
     "S_SNEAKERGATE", "MT_SNEAKERGATE",
     "S_INVINCGATE", "MT_INVINCGATE",
     "S_GROWGATE", "MT_GROWGATE",
@@ -44,7 +45,7 @@ freeslot(
 states[S_PAIR_MARKER] = {SPR_PAIR, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_PAIR_MARKER}
 states[S_PAIR_MARKER_TRANS] = {SPR_PAIR, FF_FULLBRIGHT|TR_TRANS50|A, -1, nil, 0, 0, S_PAIR_MARKER}
 mobjinfo[MT_PAIR_MARKER] = {
-    spawnstate = S_PAIR_MARKER
+    spawnstate = S_PAIR_MARKER,
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
@@ -63,6 +64,16 @@ mobjinfo[MT_PAIR_POINTER] = {
 states[S_SYNC_MAXDIST] = {SPR_PARL, FF_FULLBRIGHT|FF_PAPERSPRITE|A, -1, nil, 0, 0, S_SYNC_MAXDIST}
 mobjinfo[MT_SYNC_MAXDIST] = {
     spawnstate = S_SYNC_MAXDIST,
+    spawnhealth = 1000,
+    radius = 32*FRACUNIT,
+    height = 32*FRACUNIT,
+    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
+}
+
+states[S_SYNCBOOST_INDICATOR_1] = {SPR_SYNC, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_SYNCBOOST_INDICATOR_1}
+states[S_SYNCBOOST_INDICATOR_2] = {SPR_SYNC, FF_FULLBRIGHT|B, -1, nil, 0, 0, S_SYNCBOOST_INDICATOR_2}
+mobjinfo[MT_SYNCBOOST_INDICATOR] = {
+    spawnstate = S_SYNCBOOST_INDICATOR_1,
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
@@ -668,9 +679,8 @@ local function think()
                 continue
             end
             if not (pm.pairpointer and pm.pairpointer.valid) then
-                pm.pairpointer = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
+                pm.pairpointer = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_PAIR_POINTER)
                 pm.pairpointer.scale = FRACUNIT/2
-                pm.pairpointer.state = S_PAIR_POINTER
             end
             
             if pm.pairpointer and pm.pairpointer.valid then -- sometimes the spawnmobj fails and everything would die
@@ -764,24 +774,18 @@ local function think()
                 end
 
                 if not (pm.syncboostindicator and pm.syncboostindicator.valid) then
-                    pm.syncboostindicator = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
-                    pm.syncboostindicator.tics = -1
+                    pm.syncboostindicator = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_SYNCBOOST_INDICATOR)
                     pm.syncboostindicator.color = p.skincolor
                     pm.syncboostindicator.scale = p.mo.scale / 2
-                    pm.syncboostindicator.sprite = SPR_SYNC
                     if pm.syncboostword then
-                        pm.syncboostindicator.frame = 0
-                    else
-                        pm.syncboostindicator.frame = 1
+                        pm.syncboostindicator.state = S_SYNCBOOST_INDICATOR_2
                     end
                 end
 
                 if not (pm.syncboostradiusindicator and pm.syncboostradiusindicator.valid) then
-                    pm.syncboostradiusindicator = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
-                    pm.syncboostradiusindicator.tics = -1
+                    pm.syncboostradiusindicator = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_SYNC_MAXDIST)
                     pm.syncboostradiusindicator.color = p.skincolor
                     pm.syncboostradiusindicator.scale = p.mo.scale/2
-                    pm.syncboostradiusindicator.state = S_SYNC_MAXDIST
                 end
             elseif pm.syncboost then
                 pm.syncboost = max($-1, 0)

@@ -1084,28 +1084,11 @@ addHook("NetVars", netVars)
 --## Hud ##--
 -- Constants
 local ITEMX = 160
-local ITEMY = 163
+local ITEMY = 157
 local ITEMTEXTX = 36
 local ITEMTEXTY = 26
 
-local ITEMMINI = {
-    "K_ISSHOE",
-    "K_ISRSHE",
-    "K_ISINV1",
-    "K_ISBANA",
-    "K_ISEGGM",
-    "K_ISORBN",
-    "K_ISJAWZ",
-    "K_ISMINE",
-    "K_ISBHOG",
-    "K_ISSPB",
-    "K_ISGROW",
-    "K_ISSHRK",
-    "K_ISTHNS",
-    "K_ISHYUD",
-    "K_ISPOGO",
-    "K_ISSINK"
-}
+local TEAMMATE_VFLAGS = V_SNAPTOBOTTOM|V_HUDTRANS
 
 -- Variables
 local playerfacesgfx = {}
@@ -1114,39 +1097,18 @@ local miniiteminvulgfx
 local sadgfx
 
 -- Functions
-local function pairHud(v, p)
-    do
-        --Rank faces
-        for i = 0, #skins-1 do
-            if not playerfacesgfx[skins[i].name] then
-                playerfacesgfx[skins[i].name] = v.cachePatch(skins[i].facerank)
-            end
-        end
-
-        --Mini items
-        if not miniitemgfx then
-            miniitemgfx = {}
-            for i, k in ipairs(ITEMMINI) do
-                --print("Caching " .. k .. " into " .. i)
-                miniitemgfx[i] = v.cachePatch(k)
-            end
-        end
-
-        --Mini invul
-        if not miniiteminvulgfx then
-            miniiteminvulgfx = {}
-            for i = 1, 6 do
-                --print("Caching K_ISINV" .. i .. " into " .. i)
-                miniiteminvulgfx[i-1] = v.cachePatch("K_ISINV" .. i)
-            end
-        end
-
-        --Sad face (for yes)
-        if not sadgfx then
-            sadgfx = v.cachePatch("K_ITSAD")
-        end
+local function getItemPatchName(itemId)
+    if xItemLib then
+        return xItemLib.func.getSinglePatch(itemId, true, true)
     end
+    if itemId == KITEM_INVINCIBILITY then
+        --inv is shiny
+        return string.format("K_ISINV%d", (leveltime%(6*3))/3)
+    end
+    return K_GetItemPatch(itemId, true)
+end
 
+local function pairHud(v, p)
     --## Face ##--
     if p and p.valid and p.pairmod
     and p.pairmod.pair and p.pairmod.pair.valid and not p.pairmod.pair.spectator then
@@ -1154,42 +1116,42 @@ local function pairHud(v, p)
         if p.pairmod.pair.mo.colorized then
             skinused = TC_RAINBOW
         end
-        v.draw(152, 171, playerfacesgfx[p.pairmod.pair.mo.skin], V_SNAPTOBOTTOM|V_HUDTRANS, v.getColormap(skinused, p.pairmod.pair.mo.color))
-        v.drawString(160, 190, "Team: " .. p.pairmod.pair.name, V_ALLOWLOWERCASE|V_SNAPTOBOTTOM|V_HUDTRANS, "center")
+        v.draw(152, 171, v.cachePatch(skins[p.pairmod.pair.mo.skin].facerank), TEAMMATE_VFLAGS, v.getColormap(skinused, p.pairmod.pair.mo.color))
+        
+        local s = tostring(p.pairmod.pair.name)
+        v.drawString(160 - (v.stringWidth(s, V_6WIDTHSPACE, "thin") / 2), 190, s, V_ALLOWLOWERCASE|V_6WIDTHSPACE|TEAMMATE_VFLAGS, "thin")
         
         --## Items ##--
-        do
-            local p = p.pairmod.pair
+        local pair_p = p.pairmod.pair
 
-            local itemcount = p.kartstuff[k_itemamount]
+        local itemcount = pair_p.kartstuff[k_itemamount]
 
-            if p.kartstuff[k_rocketsneakertimer] then
-                if not (leveltime&1) then
-                    v.draw(ITEMX, ITEMY, miniitemgfx[2], vflags)				
-                end
-            elseif p.kartstuff[k_eggmanexplode] then
-                local flashtime = 4<<(p.kartstuff[k_eggmanexplode]/TICRATE)
-                local cmap = nil
-                if not (p.kartstuff[k_eggmanexplode] == 1
-                or (p.kartstuff[k_eggmanexplode] % (flashtime/2) ~= 0)) then
-                    cmap = v.getColormap(TC_BLINK, SKINCOLOR_CRIMSON)
-                end				
-                v.draw(ITEMX, ITEMY, miniitemgfx[5], vflags, cmap)				
-            elseif p.kartstuff[k_itemtype] then
-                local itemp = miniitemgfx[p.kartstuff[k_itemtype]] or sadgfx
-                --inv is shiny
-                if p.kartstuff[k_itemtype] == KITEM_INVINCIBILITY then
-                    itemp = miniiteminvulgfx[((leveltime%(6*3))/3)]
-                end
-                --draw amount as a number
-                if not (p.kartstuff[k_itemheld] and not (leveltime&1)) then
-                    v.draw(ITEMX, ITEMY, itemp, vflags)
-                    if itemcount > 1 then
-                        v.drawString(ITEMX+ITEMTEXTX, ITEMY+ITEMTEXTY, itemcount, vflags, "right")
-                    end
+        if pair_p.kartstuff[k_rocketsneakertimer] then
+            if not (leveltime&1) then
+                v.draw(ITEMX, ITEMY, v.cachePatch(getItemPatchName(KITEM_ROCKETSNEAKER)), TEAMMATE_VFLAGS)				
+            end
+        elseif pair_p.kartstuff[k_eggmanexplode] then
+            local flashtime = 4<<(pair_p.kartstuff[k_eggmanexplode]/TICRATE)
+            local cmap = nil
+            if not (pair_p.kartstuff[k_eggmanexplode] == 1
+            or (pair_p.kartstuff[k_eggmanexplode] % (flashtime/2) ~= 0)) then
+                cmap = v.getColormap(TC_BLINK, SKINCOLOR_CRIMSON)
+            end				
+            v.draw(ITEMX, ITEMY, v.cachePatch(getItemPatchName(KITEM_EGGMAN)), TEAMMATE_VFLAGS, cmap)				
+        elseif pair_p.kartstuff[k_itemtype] then
+            local itemp = v.cachePatch(getItemPatchName(pair_p.kartstuff[k_itemtype]))
+            --draw amount as a number
+            if not (pair_p.kartstuff[k_itemheld] and not (leveltime&1)) then
+                v.draw(ITEMX, ITEMY, itemp, TEAMMATE_VFLAGS)
+                if itemcount > 1 then
+                    v.drawString(ITEMX+ITEMTEXTX, ITEMY+ITEMTEXTY, itemcount, TEAMMATE_VFLAGS, "right")
                 end
             end
         end
+
+        -- Rank icons
+        local patch_to_draw = v.cachePatch(string.format("OPPRNK%02d", pair_p.kartstuff[k_position]))
+        v.draw(148, 182, patch_to_draw, TEAMMATE_VFLAGS)
     end
 
     --## Info messages ##--

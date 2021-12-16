@@ -34,7 +34,7 @@ freeslot(
     "S_PAIR_POINTER", "MT_PAIR_POINTER",
     "S_PAIR_MARKER", "S_PAIR_MARKER_TRANS", "MT_PAIR_MARKER",
     "S_SYNC_MAXDIST", "MT_SYNC_MAXDIST",
-    "S_SYNCBOOST_INDICATOR_1", "S_SYNCBOOST_INDICATOR_2", "MT_SYNCBOOST_INDICATOR",
+    "S_SYNCBOOST_EFFECT_1", "S_SYNCBOOST_EFFECT_2", "MT_SYNCBOOST_EFFECT",
     "S_SNEAKERGATE", "MT_SNEAKERGATE",
     "S_INVINCGATE", "MT_INVINCGATE",
     "S_GROWGATE", "MT_GROWGATE",
@@ -52,7 +52,7 @@ mobjinfo[MT_PAIR_MARKER] = {
     flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
-states[S_PAIR_POINTER] = {SPR_PLAY, FF_FULLBRIGHT|TR_TRANS50|A, -1, nil, 0, 0, S_PAIR_POINTER}
+states[S_PAIR_POINTER] = {SPR_PLAY, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_PAIR_POINTER}
 mobjinfo[MT_PAIR_POINTER] = {
     spawnstate = S_PAIR_POINTER,
     spawnhealth = 1000,
@@ -70,10 +70,10 @@ mobjinfo[MT_SYNC_MAXDIST] = {
     flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
-states[S_SYNCBOOST_INDICATOR_1] = {SPR_SYNC, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_SYNCBOOST_INDICATOR_1}
-states[S_SYNCBOOST_INDICATOR_2] = {SPR_SYNC, FF_FULLBRIGHT|B, -1, nil, 0, 0, S_SYNCBOOST_INDICATOR_2}
-mobjinfo[MT_SYNCBOOST_INDICATOR] = {
-    spawnstate = S_SYNCBOOST_INDICATOR_1,
+states[S_SYNCBOOST_EFFECT_1] = {SPR_SYNC, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_SYNCBOOST_EFFECT_1}
+states[S_SYNCBOOST_EFFECT_2] = {SPR_SYNC, FF_FULLBRIGHT|B, -1, nil, 0, 0, S_SYNCBOOST_EFFECT_2}
+mobjinfo[MT_SYNCBOOST_EFFECT] = {
+    spawnstate = S_SYNCBOOST_EFFECT_1,
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
@@ -125,7 +125,6 @@ rawset(_G, "pairmod", {})
 pairmod.running = false
 
 --## Global variables ##--
-local pairMarker = nil
 local pairmod_stopgamemode = false
 local pairmod_ranIntermission = true
 local resetcolourcvars = nil
@@ -146,6 +145,13 @@ local cv_enabled = CV_RegisterVar{
     PossibleValue = CV_OnOff,
 }
 
+local cv_showRangeFrom = CV_RegisterVar{
+    name = "pm_showsyncboostrangefrom",
+    defaultvalue = "Teammate",
+    flags = CV_NETVAR,
+    PossibleValue = {Off = 0, Center = 1, Teammate = 2},
+}
+
 --## Functions ##--
 local function resetVars(p)
     p.pairmod = {
@@ -159,7 +165,6 @@ local function resetVars(p)
         syncboost = 0,
         syncboostindicator = nil,
         syncboostradiusindicator = nil,
-        oldskincolor = SKINCOLOR_BLACK,
         gatechain = 0,
         gatechainreset = 0,
         teamid = nil
@@ -347,10 +352,6 @@ local function allExiting()
 end
 
 local function cleanUpObjects()
-    if pairMarker and pairMarker.valid then
-        P_RemoveMobj(pairMarker)
-        pairMarker = nil
-    end
     for p in players.iterate do
         if p.pairmod then
             if p.pairmod.pairpointer and p.pairmod.pairpointer.valid then
@@ -369,6 +370,8 @@ local function cleanUpObjects()
     end
 end
 
+-- Object spawning functions
+
 local function spawnGate(p, gatetype)
     local gate = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, gatetype)
     gate.fuse = TICRATE*15
@@ -376,6 +379,42 @@ local function spawnGate(p, gatetype)
     gate.scale = FixedMul($, FRACUNIT*3)
     gate.angle = p.mo.angle + ANGLE_90
     gate.flags2 = $|MF2_DONTDRAW
+    return gate
+end
+
+local function spawnMaxRangeIndicator(p)
+    local mo = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_SYNCBOOST_EFFECT)
+    mo.color = p.skincolor
+    mo.scale = p.mo.scale / 2
+    if p.pairmod.syncboostword then
+        mo.state = S_SYNCBOOST_EFFECT_2
+    end
+    mo.target = p.mo
+    return mo
+end
+
+local function spawnPairMarker(dpIndex)
+    local mo = P_SpawnMobj(0, 0, 0, MT_PAIR_MARKER)
+    mo.pm_indexwatch = dpIndex
+    mo.eflags = $ | (MFE_DRAWONLYFORP1 << (dpIndex - 1))
+    return mo
+end
+
+local function spawnPairPointer(dpIndex)
+    local mo = P_SpawnMobj(0, 0, 0, MT_PAIR_POINTER)
+    mo.scale = FRACUNIT/2
+    mo.pm_indexwatch = dpIndex
+    mo.eflags = $ | (MFE_DRAWONLYFORP1 << (dpIndex - 1))
+    return mo
+end
+
+local function spawnSyncboostMaxDistanceIndicatior(dpIndex, side)
+    local mo = P_SpawnMobj(0, 0, 0, MT_SYNC_MAXDIST)
+    mo.pm_indexwatch = dpIndex
+    mo.pm_side = side
+    mo.scale = FRACUNIT/2
+    mo.eflags = $ | (MFE_DRAWONLYFORP1 << (dpIndex - 1))
+    return mo
 end
 
 local function trySetFriend(p, fr)
@@ -527,34 +566,41 @@ end
 COM_AddCommand("pm_acceptteam", com_acceptFriend)
 
 --## Hook functions ##--
--- Global
-local function think()
-    if leveltime < 1 then return end
-    if leveltime == 1 then
-        -- Check if gamemode should be running
-        if cv_enabled.value then
-            pairmod.running = true
-            pairMarker = P_SpawnMobj(0, 0, 0, MT_PAIR_MARKER)
-        else
-            pairmod.running = false
-        end
 
-        for p in players.iterate do
-            resetVars(p)
-        end
+local function levelInit()
+    -- Check if gamemode should be running
+    if cv_enabled.value then
+        pairmod.running = true
+        for i = 1, 4 do
+            spawnPairMarker(i)
 
-        -- do start of level stuff
-        pairmod_stopgamemode = false
-        if consoleplayer == server and pairmod_ranIntermission then
-            if not cv_kartelimlast then
-                cv_kartelimlast = CV_FindVar("karteliminatelast")
+            spawnPairPointer(i)
+
+            for i2 = 1, 2 do
+                spawnSyncboostMaxDistanceIndicatior(i, i2)
             end
-            kartelimlast = cv_kartelimlast.string
-            COM_BufInsertText(server, "karteliminatelast off")
         end
-        pairmod_ranIntermission = false
+    else
+        pairmod.running = false
     end
 
+    for p in players.iterate do
+        resetVars(p)
+    end
+
+    -- do start of level stuff
+    pairmod_stopgamemode = false
+    if consoleplayer == server and pairmod_ranIntermission then
+        if not cv_kartelimlast then
+            cv_kartelimlast = CV_FindVar("karteliminatelast")
+        end
+        kartelimlast = cv_kartelimlast.string
+        COM_BufInsertText(server, "karteliminatelast off")
+    end
+    pairmod_ranIntermission = false
+end
+
+local function runInfoMessageTimer()
     --## Info message timer ##--
     if infoMessageTimer then
         infoMessageTimer = $-1
@@ -562,6 +608,214 @@ local function think()
             infoMessage = ""
         end
     end
+end
+
+local function doGamemodeExit()
+    pairmod_stopgamemode = true
+    cleanUpObjects()
+    local pingame = playersInGame()
+    local scores = {}
+    while #pingame do
+        local p = pingame[1]
+        local scoreadd = {players={}, time=0}
+        local dontadd = false
+        if p.pairmod and p.pairmod.pair and p.pairmod.pair.valid then
+            for i = 2, #pingame do
+                if pingame[i] == p.pairmod.pair then
+                    table.remove(pingame, i)
+                    break
+                end
+            end
+            if (p.pflags & PF_TIMEOVER) or (p.pairmod.pair.pflags & PF_TIMEOVER) then
+                p.realtime = -1
+                p.pairmod.pair.realtime = -1
+
+                dontadd = true
+            else
+                local totaltime = p.realtime + p.pairmod.pair.realtime
+                p.realtime = totaltime
+                p.pairmod.pair.realtime = totaltime
+
+                scoreadd.time = totaltime
+                scoreadd.players[1] = p
+                scoreadd.players[2] = p.pairmod.pair
+            end
+        else
+            p.realtime = $*2
+
+            scoreadd.time = p.realtime
+            scoreadd.players[1] = p
+        end
+        table.remove(pingame, 1)
+        if not dontadd then
+            table.insert(scores, scoreadd)
+        end
+    end
+    table.sort(scores, scoreSortFunction)
+    eolScores = processScores(scores)
+
+    -- assign placements to players based on their pos
+    for i, k in ipairs(eolScores) do
+        for i2, k2 in ipairs(k.players) do
+            k2.kartstuff[k_position] = i
+        end
+    end
+end
+
+local function doGateSpawning(p)
+    local pm = p.pairmod
+
+    --sneaker
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and pm.lastitemtype == KITEM_SNEAKER
+    and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
+    and not p.kartstuff[k_stolentimer]
+    and p.kartstuff[k_sneakertimer] >= (TICRATE + (TICRATE/3))-1 then
+        spawnGate(p, MT_SNEAKERGATE)
+    end
+
+    --rocket sneaker
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and (pm.lastrocketsneakertimer >= p.kartstuff[k_rocketsneakertimer]+(2*TICRATE)
+    or (pm.lastrocketsneakertimer and not p.kartstuff[k_rocketsneakertimer]))
+    and p.kartstuff[k_sneakertimer] >= (TICRATE + (TICRATE/3))-1 then
+        spawnGate(p, MT_SNEAKERGATE)
+    end
+
+    --invince
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and pm.lastitemtype == KITEM_INVINCIBILITY
+    and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
+    and not p.kartstuff[k_stolentimer]
+    and p.kartstuff[k_invincibilitytimer] >= (10*TICRATE)-1 then
+        spawnGate(p, MT_INVINCGATE)
+    end
+
+    --grow
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and pm.lastitemtype == KITEM_GROW
+    and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
+    and not p.kartstuff[k_stolentimer]
+    and p.kartstuff[k_growshrinktimer] >= (12*TICRATE)-1 then
+        spawnGate(p, MT_GROWGATE)
+    end
+
+    --hyudoro
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and pm.lastitemtype == KITEM_HYUDORO
+    and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
+    and not p.kartstuff[k_stolentimer]
+    and p.kartstuff[k_hyudorotimer] >= (7*TICRATE)-1 then
+        spawnGate(p, MT_HYUDOROGATE)
+    end
+end
+
+local function doGateChainTimer(p)
+    local pm = p.pairmod
+
+    if pm.gatechainreset then
+        pm.gatechainreset = $-1
+        if not pm.gatechainreset then
+            pm.gatechain = 0
+        end
+    end
+end
+
+local function doSyncboost(p)
+    local pm = p.pairmod
+
+    if leveltime > STARTTIME then
+        local dist = R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
+        if dist <= SYNCBOOST_MAXDIST then
+            local lastsync = pm.syncboost
+            pm.syncboost = min($+1, SYNCBOOST_MAXBOOST)
+
+            if lastsync == SYNCBOOST_MAXBOOST-1 and pm.syncboost == SYNCBOOST_MAXBOOST then
+                setInfoMessage(p, "Max syncboost!")
+                S_StartSound(p.mo, sfx_s23c)
+            end
+
+            if not (pm.syncboostindicator and pm.syncboostindicator.valid) then
+                pm.syncboostindicator = spawnMaxRangeIndicator(p)
+            end
+        elseif pm.syncboost then
+            pm.syncboost = max($-1, 0)
+            if not pm.syncboost then
+                p.mo.colorized = false
+            end
+        end
+
+        p.kartstuff[k_speedboost] = max($, FixedMul(FRACUNIT/7, FixedDiv(pm.syncboost, SYNCBOOST_MAXBOOST)))
+        p.kartstuff[k_accelboost] = max($, FixedMul(FRACUNIT/2, FixedDiv(pm.syncboost, SYNCBOOST_MAXBOOST)))
+
+        if pm.syncboost then
+            p.mo.colorized = true
+            if (pm.syncboost < (SYNCBOOST_MAXBOOST / 2) and not (pm.syncboost % 16))
+            or (pm.syncboost > (SYNCBOOST_MAXBOOST / 2) and pm.syncboost < SYNCBOOST_MAXBOOST and not (pm.syncboost % 8))
+            or (pm.syncboost == SYNCBOOST_MAXBOOST and not (leveltime % 4)) then
+                P_SpawnGhostMobj(p.mo)
+            end
+        end
+    end
+end
+
+local function doRecovery(p)
+    local pm = p.pairmod
+
+    if (p.kartstuff[k_spinouttimer] or p.kartstuff[k_wipeoutslow]) and p.kartstuff[k_spinouttimer] < SPINOUT_TIMER / 2
+    and R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y) < RECOVER_RANGE then
+        p.kartstuff[k_spinouttimer] = 0
+        p.kartstuff[k_wipeoutslow] = 0
+        p.powers[pw_flashing] = K_GetKartFlashing(p) / 2
+        K_DoSneaker(p)
+        setInfoMessage(p, "Recovery!")
+        setInfoMessage(pm.pair, "Recovered teammate!")
+    end
+end
+
+local function forceTeamColour(p)
+    local pm = p.pairmod
+
+    if pm.teamid and TEAMCOLOURS[pm.teamid] then
+        p.skincolor = TEAMCOLOURS[pm.teamid]
+    end
+end
+
+local function playerThinker(p)
+    if not p.pairmod then
+        resetVars(p)
+    end
+
+    local pm = p.pairmod
+
+    if p.spectator then
+        return
+    end
+
+    -- no teammate? stop here
+    if not (pm.pair
+    and pm.pair.valid
+    and not pm.pair.spectator) then return end
+
+    doGateSpawning(p)
+
+    doGateChainTimer(p)
+
+    doSyncboost(p)
+
+    doRecovery(p)
+
+    forceTeamColour(p)
+end
+
+-- Global
+local function think()
+    if leveltime < 1 then return end
+    if leveltime == 1 then
+        levelInit()
+    end
+
+    runInfoMessageTimer()
 
     -- KEEP THIS AFTER THE LEVELTIME CHECK OTHERWISE IT WILL BREAK!!!!!!!!!!!!!!
     if pairmod_stopgamemode then
@@ -579,276 +833,13 @@ local function think()
 
     --## End gamemode, tally scores ##--
     if allExiting() then
-        pairmod_stopgamemode = true
-        cleanUpObjects()
-        local pingame = playersInGame()
-        local scores = {}
-        while #pingame do
-            local p = pingame[1]
-            local scoreadd = {players={}, time=0}
-            local dontadd = false
-            if p.pairmod and p.pairmod.pair and p.pairmod.pair.valid then
-                for i = 2, #pingame do
-                    if pingame[i] == p.pairmod.pair then
-                        table.remove(pingame, i)
-                        break
-                    end
-                end
-                if (p.pflags & PF_TIMEOVER) or (p.pairmod.pair.pflags & PF_TIMEOVER) then
-                    p.realtime = -1
-                    p.pairmod.pair.realtime = -1
-
-                    dontadd = true
-                else
-                    local totaltime = p.realtime + p.pairmod.pair.realtime
-                    p.realtime = totaltime
-                    p.pairmod.pair.realtime = totaltime
-
-                    scoreadd.time = totaltime
-                    scoreadd.players[1] = p
-                    scoreadd.players[2] = p.pairmod.pair
-                end
-            else
-                p.realtime = $*2
-
-                scoreadd.time = p.realtime
-                scoreadd.players[1] = p
-            end
-            table.remove(pingame, 1)
-            if not dontadd then
-                table.insert(scores, scoreadd)
-            end
-        end
-        table.sort(scores, scoreSortFunction)
-        eolScores = processScores(scores)
-
-        -- assign placements to players based on their pos
-        for i, k in ipairs(eolScores) do
-            for i2, k2 in ipairs(k.players) do
-                k2.kartstuff[k_position] = i
-            end
-        end
-
+        doGamemodeExit()
         return
-    end
-
-    if not (pairMarker and pairMarker.valid) then
-        pairMarker = P_SpawnMobj(0, 0, 0, MT_PAIR_MARKER)
-    end
-
-    --## Pairmarker teleport ##--
-    do
-        local dp = displayplayers[0]
-        if dp and dp.valid
-        and dp.pairmod
-        and dp.pairmod.pair and dp.pairmod.pair.valid
-        and dp.pairmod.pair.mo and dp.pairmod.pair.mo.valid then
-            -- AND NOW TELEPORT!
-            local pmo = dp.pairmod.pair.mo
-            P_TeleportMove(pairMarker, pmo.x, pmo.y, pmo.z)
-            pairMarker.scale = pmo.scale
-            pairMarker.flags2 = $&(~MF2_DONTDRAW)
-
-            if dp.mo and dp.mo.valid 
-            and R_PointToDist2(dp.mo.x, dp.mo.y, pmo.x, pmo.y) < SYNCBOOST_MAXDIST then
-                pairMarker.state = S_PAIR_MARKER_TRANS
-            else
-                pairMarker.state = S_PAIR_MARKER
-            end
-        else
-            pairMarker.flags2 = $|MF2_DONTDRAW
-        end
     end
 
     --## Main loop ##--
     for p in players.iterate do
-        if not p.pairmod then
-            resetVars(p)
-        end
-
-        local pm = p.pairmod
-
-        --## Pair pointer ##--
-        do
-            if p.spectator then
-                copyLatent(p)
-                if pm.pairpointer and pm.pairpointer.valid then
-                    P_RemoveMobj(pm.pairpointer)
-                    pm.pairpointer = nil
-                end
-                continue
-            end
-            if not (pm.pairpointer and pm.pairpointer.valid) then
-                pm.pairpointer = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_PAIR_POINTER)
-                pm.pairpointer.scale = FRACUNIT/2
-            end
-            
-            if pm.pairpointer and pm.pairpointer.valid then -- sometimes the spawnmobj fails and everything would die
-                if pm.pair and pm.pair.valid and not pm.pair.spectator then
-                    local ang = R_PointToAngle2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-                    local dist = R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-                    P_TeleportMove(pm.pairpointer, p.mo.x + FixedMul(FixedMul(FixedMul(sin(ang+ANGLE_90), dist), FRACUNIT/64), p.mo.scale),
-                                                   p.mo.y + FixedMul(FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), FRACUNIT/64), p.mo.scale),
-                                                   p.mo.z + FixedMul(FixedMul(pm.pair.mo.z - p.mo.z, FRACUNIT/64), p.mo.scale))
-                    pm.pairpointer.scale = p.mo.scale/2
-                    pm.pairpointer.color = pm.pair.mo.color
-                    pm.pairpointer.skin = pm.pair.mo.skin
-                    pm.pairpointer.angle = pm.pair.frameangle
-                    pm.pairpointer.flags2 = $&(~MF2_DONTDRAW)
-                else
-                    pm.pairpointer.flags2 = $|MF2_DONTDRAW
-                end
-            end
-        end
-
-        -- no teammate? stop here
-        if not (pm.pair
-        and pm.pair.valid
-        and not pm.pair.spectator) then continue end -- STOP USING RETURN ITS CONTINUE
-        
-        --## Gate spawning ##--
-        do
-            --sneaker
-            if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
-            and pm.lastitemtype == KITEM_SNEAKER
-            and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
-            and not p.kartstuff[k_stolentimer]
-            and p.kartstuff[k_sneakertimer] >= (TICRATE + (TICRATE/3))-1 then
-                spawnGate(p, MT_SNEAKERGATE)
-            end
-
-            --rocket sneaker
-            if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
-            and (pm.lastrocketsneakertimer >= p.kartstuff[k_rocketsneakertimer]+(2*TICRATE)
-            or (pm.lastrocketsneakertimer and not p.kartstuff[k_rocketsneakertimer]))
-            and p.kartstuff[k_sneakertimer] >= (TICRATE + (TICRATE/3))-1 then
-                spawnGate(p, MT_SNEAKERGATE)
-            end
-
-            --invince
-            if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
-            and pm.lastitemtype == KITEM_INVINCIBILITY
-            and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
-            and not p.kartstuff[k_stolentimer]
-            and p.kartstuff[k_invincibilitytimer] >= (10*TICRATE)-1 then
-                spawnGate(p, MT_INVINCGATE)
-            end
-
-            --grow
-            if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
-            and pm.lastitemtype == KITEM_GROW
-            and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
-            and not p.kartstuff[k_stolentimer]
-            and p.kartstuff[k_growshrinktimer] >= (12*TICRATE)-1 then
-                spawnGate(p, MT_GROWGATE)
-            end
-
-            --hyudoro
-            if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
-            and pm.lastitemtype == KITEM_HYUDORO
-            and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
-            and not p.kartstuff[k_stolentimer]
-            and p.kartstuff[k_hyudorotimer] >= (7*TICRATE)-1 then
-                spawnGate(p, MT_HYUDOROGATE)
-            end
-        end
-
-        --## Gate chain timer ##--
-        if pm.gatechainreset then
-            pm.gatechainreset = $-1
-            if not pm.gatechainreset then
-                pm.gatechain = 0
-            end
-        end
-
-        --## Syncboosts ##--
-        if leveltime > STARTTIME then
-            local dist = R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-            if dist <= SYNCBOOST_MAXDIST then
-                local lastsync = pm.syncboost
-                pm.syncboost = min($+1, SYNCBOOST_MAXBOOST)
-
-                if lastsync == SYNCBOOST_MAXBOOST-1 and pm.syncboost == SYNCBOOST_MAXBOOST then
-                    setInfoMessage(p, "Max syncboost!")
-                    S_StartSound(p.mo, sfx_s23c)
-                end
-
-                if not (pm.syncboostindicator and pm.syncboostindicator.valid) then
-                    pm.syncboostindicator = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_SYNCBOOST_INDICATOR)
-                    pm.syncboostindicator.color = p.skincolor
-                    pm.syncboostindicator.scale = p.mo.scale / 2
-                    if pm.syncboostword then
-                        pm.syncboostindicator.state = S_SYNCBOOST_INDICATOR_2
-                    end
-                end
-
-                if not (pm.syncboostradiusindicator and pm.syncboostradiusindicator.valid) then
-                    pm.syncboostradiusindicator = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_SYNC_MAXDIST)
-                    pm.syncboostradiusindicator.color = p.skincolor
-                    pm.syncboostradiusindicator.scale = p.mo.scale/2
-                end
-            elseif pm.syncboost then
-                pm.syncboost = max($-1, 0)
-                if not pm.syncboost then
-                    p.mo.colorized = false
-                    if pm.syncboostindicator and pm.syncboostindicator.valid then
-                        P_RemoveMobj(pm.syncboostindicator)
-                        pm.syncboostindicator = nil
-                    end
-                    if pm.syncboostradiusindicator and pm.syncboostradiusindicator.valid then
-                        P_RemoveMobj(pm.syncboostradiusindicator)
-                        pm.syncboostradiusindicator = nil
-                    end
-                end
-            end
-
-            p.kartstuff[k_speedboost] = max($, FixedMul(FRACUNIT/7, FixedDiv(pm.syncboost, SYNCBOOST_MAXBOOST)))
-            p.kartstuff[k_accelboost] = max($, FixedMul(FRACUNIT/2, FixedDiv(pm.syncboost, SYNCBOOST_MAXBOOST)))
-
-            if pm.syncboostindicator and pm.syncboostindicator.valid then
-                local timemul = FixedDiv(pm.syncboost, SYNCBOOST_MAXBOOST)
-                local ang = R_PointToAngle2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-                P_TeleportMove(pm.syncboostindicator, p.mo.x + FixedMul(FixedMul(FixedMul(sin(ang+ANGLE_90), dist), timemul/2), p.mo.scale),
-                                                      p.mo.y + FixedMul(FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), timemul/2), p.mo.scale),
-                                                      p.mo.z + FixedMul(FixedMul(pm.pair.mo.z - p.mo.z, timemul/2), p.mo.scale))
-                pm.syncboostindicator.scale = p.mo.scale / 2
-            end
-
-            if pm.syncboostradiusindicator and pm.syncboostradiusindicator.valid then
-                local ang = R_PointToAngle2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-                local center_x, center_y, center_z = (p.mo.x + pm.pair.mo.x)/2, (p.mo.y + pm.pair.mo.y)/2, (p.mo.z + pm.pair.mo.z)/2
-                P_TeleportMove(pm.syncboostradiusindicator, center_x + FixedMul(FixedMul(sin(ang+ANGLE_90), SYNCBOOST_MAXDIST/2), p.mo.scale),
-                                                            center_y + FixedMul(FixedMul(cos(ang+ANGLE_90), -SYNCBOOST_MAXDIST/2), p.mo.scale),
-                                                            center_z)
-                pm.syncboostradiusindicator.scale = p.mo.scale/2
-                pm.syncboostradiusindicator.angle = ang + ANGLE_90
-            end
-
-            if pm.syncboost then
-                p.mo.colorized = true
-                if (pm.syncboost < (SYNCBOOST_MAXBOOST / 2) and not (pm.syncboost % 16))
-                or (pm.syncboost > (SYNCBOOST_MAXBOOST / 2) and pm.syncboost < SYNCBOOST_MAXBOOST and not (pm.syncboost % 8))
-                or (pm.syncboost == SYNCBOOST_MAXBOOST and not (leveltime % 4)) then
-                    P_SpawnGhostMobj(p.mo)
-                end
-            end
-        end
-
-        if (p.kartstuff[k_spinouttimer] or p.kartstuff[k_wipeoutslow]) and p.kartstuff[k_spinouttimer] < SPINOUT_TIMER / 2
-        and R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y) < RECOVER_RANGE then
-            p.kartstuff[k_spinouttimer] = 0
-            p.kartstuff[k_wipeoutslow] = 0
-            p.powers[pw_flashing] = K_GetKartFlashing(p) / 2
-            K_DoSneaker(p)
-            setInfoMessage(p, "Recovery!")
-            setInfoMessage(pm.pair, "Recovered teammate!")
-        end
-
-        --## Team colour forcing ##--
-        if pm.teamid and TEAMCOLOURS[pm.teamid] then
-            p.skincolor = TEAMCOLOURS[pm.teamid]
-        end
-
+        playerThinker(p)
         copyLatent(p)
     end
 end
@@ -864,6 +855,131 @@ local function intThink()
     end
 end
 addHook("IntermissionThinker", intThink)
+
+-- Object thinkers
+
+local function pairIndicatorThink(mo)
+    if pairmod_stopgamemode then
+        P_RemoveMobj(mo)
+        return
+    end
+
+    local dp = displayplayers[mo.pm_indexwatch - 1]
+    if dp and dp.valid
+    and dp.mo and dp.mo.valid
+    and dp.pairmod
+    and dp.pairmod.pair and dp.pairmod.pair.valid
+    and dp.pairmod.pair.mo and dp.pairmod.pair.mo.valid then
+        -- AND NOW TELEPORT!
+        local pmo = dp.pairmod.pair.mo
+        P_TeleportMove(mo, pmo.x, pmo.y, pmo.z)
+        mo.scale = pmo.scale
+        mo.flags2 = $&(~MF2_DONTDRAW)
+
+        if R_PointToDist2(dp.mo.x, dp.mo.y, pmo.x, pmo.y) < SYNCBOOST_MAXDIST then
+            mo.state = S_PAIR_MARKER_TRANS
+        else
+            mo.state = S_PAIR_MARKER
+        end
+    else
+        mo.flags2 = $|MF2_DONTDRAW
+    end
+end
+addHook("MobjThinker", pairIndicatorThink, MT_PAIR_MARKER)
+
+local function pairPointerThink(mo)
+    if pairmod_stopgamemode then
+        P_RemoveMobj(mo)
+        return
+    end
+
+    local dp = displayplayers[mo.pm_indexwatch - 1]
+    if dp and dp.valid
+    and dp.mo and dp.mo.valid
+    and dp.pairmod
+    and dp.pairmod.pair and dp.pairmod.pair.valid
+    and dp.pairmod.pair.mo and dp.pairmod.pair.mo.valid then
+        P_TeleportMove(mo, dp.mo.x + FixedMul(FixedMul(dp.pairmod.pair.mo.x - dp.mo.x, FRACUNIT/64), mapobjectscale),
+                           dp.mo.y + FixedMul(FixedMul(dp.pairmod.pair.mo.y - dp.mo.y, FRACUNIT/64), mapobjectscale),
+                           dp.mo.z + FixedMul(FixedMul(dp.pairmod.pair.mo.z - dp.mo.z, FRACUNIT/64), mapobjectscale))
+        mo.scale = dp.pairmod.pair.mo.scale/2
+        mo.color = dp.pairmod.pair.mo.color
+        mo.skin = dp.pairmod.pair.mo.skin
+        mo.angle = dp.pairmod.pair.frameangle
+        mo.flags2 = $&(~MF2_DONTDRAW)
+
+        -- Get transparency
+        mo.frame = $ & ~FF_TRANSMASK
+        local dist = R_PointToDist2(dp.mo.x, dp.mo.y, dp.pairmod.pair.mo.x, dp.pairmod.pair.mo.y)
+        local new_trans_level = (7 - min(max(abs(FixedInt(FixedDiv(max(dist - (SYNCBOOST_MAXDIST / 2), 0), SYNCBOOST_MAXDIST / 16))), 0), 7)) + 2
+        mo.frame = $ | (new_trans_level << 16)
+        print(new_trans_level)
+    else
+        mo.flags2 = $|MF2_DONTDRAW
+    end
+end
+addHook("MobjThinker", pairPointerThink, MT_PAIR_POINTER)
+
+local function syncBoostRadiusIndicatorThinker(mo)
+    local dp = displayplayers[mo.pm_indexwatch - 1]
+    if cv_showRangeFrom.value ~= 0
+    and dp and dp.valid
+    and dp.mo and dp.mo.valid
+    and dp.pairmod
+    and dp.pairmod.pair and dp.pairmod.pair.valid
+    and dp.pairmod.pair.mo and dp.pairmod.pair.mo.valid then
+        local ang = R_PointToAngle2(dp.pairmod.pair.mo.x, dp.pairmod.pair.mo.y, dp.mo.x, dp.mo.y)
+        local center_x, center_y, center_z = 0, 0, 0
+        if cv_showRangeFrom.value == 1 then -- Center
+            center_x, center_y, center_z = (dp.mo.x + dp.pairmod.pair.mo.x)/2, (dp.mo.y + dp.pairmod.pair.mo.y)/2, (dp.mo.z + dp.pairmod.pair.mo.z)/2
+        elseif cv_showRangeFrom.value == 2 then -- Teammate
+            center_x, center_y = dp.pairmod.pair.mo.x + FixedMul(cos(ang), SYNCBOOST_MAXDIST / 2), dp.pairmod.pair.mo.y + FixedMul(sin(ang), SYNCBOOST_MAXDIST / 2)
+            center_z = (dp.mo.z + dp.pairmod.pair.mo.z)/2
+        end
+        if mo.pm_side == 1 then
+            ang = $ + ANGLE_180
+        end
+        P_TeleportMove(mo, center_x + FixedMul(FixedMul(sin(ang+ANGLE_90), SYNCBOOST_MAXDIST/2), dp.mo.scale),
+                           center_y + FixedMul(FixedMul(cos(ang+ANGLE_90), -SYNCBOOST_MAXDIST/2), dp.mo.scale),
+                           center_z)
+        mo.scale = dp.mo.scale/2
+        mo.angle = ang + ANGLE_90
+        mo.color = dp.skincolor
+        mo.flags2 = $&(~MF2_DONTDRAW)
+
+        -- Get transparency
+        mo.frame = $ & ~FF_TRANSMASK
+        local dist = R_PointToDist2(dp.mo.x, dp.mo.y, dp.pairmod.pair.mo.x, dp.pairmod.pair.mo.y)
+        local new_trans_level = min(max(abs(FixedInt(FixedDiv(dist - SYNCBOOST_MAXDIST, (SYNCBOOST_MAXDIST * 2) / 9)) + 1), 0), 9)
+        mo.frame = $ | (new_trans_level << 16)
+    else
+        mo.flags2 = $|MF2_DONTDRAW
+    end
+end
+addHook("MobjThinker", syncBoostRadiusIndicatorThinker, MT_SYNC_MAXDIST)
+
+local function syncBoostEffectThinker(mo)
+    local pmo = mo.target
+    if pmo and pmo.valid
+    and pmo.player and pmo.player.valid
+    and pmo.player.pairmod
+    and pmo.player.pairmod.syncboost > 0
+    and pmo.player.pairmod.pair and pmo.player.pairmod.pair.valid
+    and pmo.player.pairmod.pair.mo and pmo.player.pairmod.pair.mo.valid then
+        local p = pmo.player
+        local timemul = FixedDiv(p.pairmod.syncboost, SYNCBOOST_MAXBOOST)
+        local ang = R_PointToAngle2(pmo.x, pmo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y)
+        local dist = R_PointToDist2(pmo.x, pmo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y)
+        P_TeleportMove(mo, pmo.x + FixedMul(FixedMul(FixedMul(sin(ang+ANGLE_90), dist), timemul/2), pmo.scale),
+                           pmo.y + FixedMul(FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), timemul/2), pmo.scale),
+                           pmo.z + FixedMul(FixedMul(p.pairmod.pair.mo.z - pmo.z, timemul/2), pmo.scale))
+        mo.scale = pmo.scale / 2
+        mo.flags2 = $&(~MF2_DONTDRAW)
+    else
+        P_RemoveMobj(mo)
+    end
+end
+addHook("MobjThinker", syncBoostEffectThinker, MT_SYNCBOOST_EFFECT)
 
 -- Gates
 local function gateThink(mo)

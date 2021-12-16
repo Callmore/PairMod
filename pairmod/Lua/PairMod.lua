@@ -180,6 +180,10 @@ local function copyLatent(p)
     pm.lastrocketsneakertimer = p.kartstuff[k_rocketsneakertimer]
 end
 
+local function mosFix(x)
+    return FixedMul(x, mapobjectscale)
+end
+
 local function isLocalPlayer(p)
     for dp in displayplayers.iterate do
         if dp == p then 
@@ -402,7 +406,7 @@ end
 
 local function spawnPairPointer(dpIndex)
     local mo = P_SpawnMobj(0, 0, 0, MT_PAIR_POINTER)
-    mo.scale = FRACUNIT/2
+    mo.scale = $/2
     mo.pm_indexwatch = dpIndex
     mo.eflags = $ | (MFE_DRAWONLYFORP1 << (dpIndex - 1))
     return mo
@@ -412,7 +416,7 @@ local function spawnSyncboostMaxDistanceIndicatior(dpIndex, side)
     local mo = P_SpawnMobj(0, 0, 0, MT_SYNC_MAXDIST)
     mo.pm_indexwatch = dpIndex
     mo.pm_side = side
-    mo.scale = FRACUNIT/2
+    mo.scale = $/2
     mo.eflags = $ | (MFE_DRAWONLYFORP1 << (dpIndex - 1))
     return mo
 end
@@ -726,7 +730,7 @@ local function doSyncboost(p)
 
     if leveltime > STARTTIME then
         local dist = R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-        if dist <= SYNCBOOST_MAXDIST then
+        if dist <= mosFix(SYNCBOOST_MAXDIST) then
             local lastsync = pm.syncboost
             pm.syncboost = min($+1, SYNCBOOST_MAXBOOST)
 
@@ -873,10 +877,9 @@ local function pairIndicatorThink(mo)
         -- AND NOW TELEPORT!
         local pmo = dp.pairmod.pair.mo
         P_TeleportMove(mo, pmo.x, pmo.y, pmo.z)
-        mo.scale = pmo.scale
         mo.flags2 = $&(~MF2_DONTDRAW)
 
-        if R_PointToDist2(dp.mo.x, dp.mo.y, pmo.x, pmo.y) < SYNCBOOST_MAXDIST then
+        if R_PointToDist2(dp.mo.x, dp.mo.y, pmo.x, pmo.y) < mosFix(SYNCBOOST_MAXDIST) then
             mo.state = S_PAIR_MARKER_TRANS
         else
             mo.state = S_PAIR_MARKER
@@ -899,9 +902,9 @@ local function pairPointerThink(mo)
     and dp.pairmod
     and dp.pairmod.pair and dp.pairmod.pair.valid
     and dp.pairmod.pair.mo and dp.pairmod.pair.mo.valid then
-        P_TeleportMove(mo, dp.mo.x + FixedMul(FixedMul(dp.pairmod.pair.mo.x - dp.mo.x, FRACUNIT/64), mapobjectscale),
-                           dp.mo.y + FixedMul(FixedMul(dp.pairmod.pair.mo.y - dp.mo.y, FRACUNIT/64), mapobjectscale),
-                           dp.mo.z + FixedMul(FixedMul(dp.pairmod.pair.mo.z - dp.mo.z, FRACUNIT/64), mapobjectscale))
+        P_TeleportMove(mo, dp.mo.x + mosFix(FixedMul(dp.pairmod.pair.mo.x - dp.mo.x, FRACUNIT/64)),
+                           dp.mo.y + mosFix(FixedMul(dp.pairmod.pair.mo.y - dp.mo.y, FRACUNIT/64)),
+                           dp.mo.z + mosFix(FixedMul(dp.pairmod.pair.mo.z - dp.mo.z, FRACUNIT/64)))
         mo.scale = dp.pairmod.pair.mo.scale/2
         mo.color = dp.pairmod.pair.mo.color
         mo.skin = dp.pairmod.pair.mo.skin
@@ -911,7 +914,7 @@ local function pairPointerThink(mo)
         -- Get transparency
         mo.frame = $ & ~FF_TRANSMASK
         local dist = R_PointToDist2(dp.mo.x, dp.mo.y, dp.pairmod.pair.mo.x, dp.pairmod.pair.mo.y)
-        local new_trans_level = (7 - min(max(abs(FixedInt(FixedDiv(max(dist - (SYNCBOOST_MAXDIST / 2), 0), SYNCBOOST_MAXDIST / 16))), 0), 7)) + 2
+        local new_trans_level = (7 - min(max(abs(FixedInt(FixedDiv(max(mosFix(dist) - (mosFix(SYNCBOOST_MAXDIST) / 2), 0), mosFix(SYNCBOOST_MAXDIST) / 16))), 0), 7)) + 2
         mo.frame = $ | (new_trans_level << 16)
         print(new_trans_level)
     else
@@ -933,16 +936,16 @@ local function syncBoostRadiusIndicatorThinker(mo)
         if cv_showRangeFrom.value == 1 then -- Center
             center_x, center_y, center_z = (dp.mo.x + dp.pairmod.pair.mo.x)/2, (dp.mo.y + dp.pairmod.pair.mo.y)/2, (dp.mo.z + dp.pairmod.pair.mo.z)/2
         elseif cv_showRangeFrom.value == 2 then -- Teammate
-            center_x, center_y = dp.pairmod.pair.mo.x + FixedMul(cos(ang), SYNCBOOST_MAXDIST / 2), dp.pairmod.pair.mo.y + FixedMul(sin(ang), SYNCBOOST_MAXDIST / 2)
+            center_x = dp.pairmod.pair.mo.x + mosFix(FixedMul(cos(ang), SYNCBOOST_MAXDIST / 2))
+            center_y = dp.pairmod.pair.mo.y + mosFix(FixedMul(sin(ang), SYNCBOOST_MAXDIST / 2))
             center_z = (dp.mo.z + dp.pairmod.pair.mo.z)/2
         end
         if mo.pm_side == 1 then
             ang = $ + ANGLE_180
         end
-        P_TeleportMove(mo, center_x + FixedMul(FixedMul(sin(ang+ANGLE_90), SYNCBOOST_MAXDIST/2), dp.mo.scale),
-                           center_y + FixedMul(FixedMul(cos(ang+ANGLE_90), -SYNCBOOST_MAXDIST/2), dp.mo.scale),
+        P_TeleportMove(mo, center_x + mosFix(FixedMul(sin(ang+ANGLE_90), SYNCBOOST_MAXDIST/2)),
+                           center_y + mosFix(FixedMul(cos(ang+ANGLE_90), -SYNCBOOST_MAXDIST/2)),
                            center_z)
-        mo.scale = dp.mo.scale/2
         mo.angle = ang + ANGLE_90
         mo.color = dp.skincolor
         mo.flags2 = $&(~MF2_DONTDRAW)
@@ -950,7 +953,7 @@ local function syncBoostRadiusIndicatorThinker(mo)
         -- Get transparency
         mo.frame = $ & ~FF_TRANSMASK
         local dist = R_PointToDist2(dp.mo.x, dp.mo.y, dp.pairmod.pair.mo.x, dp.pairmod.pair.mo.y)
-        local new_trans_level = min(max(abs(FixedInt(FixedDiv(dist - SYNCBOOST_MAXDIST, (SYNCBOOST_MAXDIST * 2) / 9)) + 1), 0), 9)
+        local new_trans_level = min(max(abs(FixedInt(FixedDiv(mosFix(dist) - mosFix(SYNCBOOST_MAXDIST), (mosFix(SYNCBOOST_MAXDIST) * 2) / 9)) + 1), 0), 9)
         mo.frame = $ | (new_trans_level << 16)
     else
         mo.flags2 = $|MF2_DONTDRAW
@@ -970,10 +973,9 @@ local function syncBoostEffectThinker(mo)
         local timemul = FixedDiv(p.pairmod.syncboost, SYNCBOOST_MAXBOOST)
         local ang = R_PointToAngle2(pmo.x, pmo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y)
         local dist = R_PointToDist2(pmo.x, pmo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y)
-        P_TeleportMove(mo, pmo.x + FixedMul(FixedMul(FixedMul(sin(ang+ANGLE_90), dist), timemul/2), pmo.scale),
-                           pmo.y + FixedMul(FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), timemul/2), pmo.scale),
-                           pmo.z + FixedMul(FixedMul(p.pairmod.pair.mo.z - pmo.z, timemul/2), pmo.scale))
-        mo.scale = pmo.scale / 2
+        P_TeleportMove(mo, pmo.x + FixedMul(FixedMul(sin(ang+ANGLE_90), dist), timemul/2),
+                           pmo.y + FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), timemul/2),
+                           pmo.z + FixedMul(p.pairmod.pair.mo.z - pmo.z, timemul/2))
         mo.flags2 = $&(~MF2_DONTDRAW)
     else
         P_RemoveMobj(mo)

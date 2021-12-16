@@ -49,7 +49,7 @@ mobjinfo[MT_PAIR_MARKER] = {
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
+    flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_PAIR_POINTER] = {SPR_PLAY, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_PAIR_POINTER}
@@ -58,7 +58,7 @@ mobjinfo[MT_PAIR_POINTER] = {
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
+    flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_SYNC_MAXDIST] = {SPR_PARL, FF_FULLBRIGHT|FF_PAPERSPRITE|A, -1, nil, 0, 0, S_SYNC_MAXDIST}
@@ -67,7 +67,7 @@ mobjinfo[MT_SYNC_MAXDIST] = {
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
+    flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_SYNCBOOST_EFFECT_1] = {SPR_SYNC, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_SYNCBOOST_EFFECT_1}
@@ -77,7 +77,7 @@ mobjinfo[MT_SYNCBOOST_EFFECT] = {
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_NOBLOCKMAP|MF_NOGRAVITY|MF_DONTENCOREMAP,
+    flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_SNEAKERGATE] = {SPR_ITEM, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|KITEM_SNEAKER, -1, nil, 0, 0, S_SNEAKERGATE}
@@ -87,7 +87,7 @@ mobjinfo[MT_SNEAKERGATE] = {
     deathsound = sfx_itpick,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_SPECIAL|MF_DONTENCOREMAP,
+    flags = MF_SPECIAL|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_INVINCGATE] = {SPR_ITMI, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|FF_ANIMATE|A, -1, nil, 3, 6, S_INVINCGATE}
@@ -97,7 +97,7 @@ mobjinfo[MT_INVINCGATE] = {
     deathsound = sfx_itpick,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_SPECIAL|MF_DONTENCOREMAP,
+    flags = MF_SPECIAL|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_GROWGATE] = {SPR_ITEM, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|KITEM_GROW, -1, nil, 0, 0, S_GROWGATE}
@@ -107,7 +107,7 @@ mobjinfo[MT_GROWGATE] = {
     deathsound = sfx_itpick,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_SPECIAL|MF_DONTENCOREMAP,
+    flags = MF_SPECIAL|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 states[S_HYUDOROGATE] = {SPR_ITEM, FF_FULLBRIGHT|FF_PAPERSPRITE|TR_TRANS30|KITEM_HYUDORO, -1, nil, 0, 0, S_HYUDOROGATE}
@@ -117,7 +117,7 @@ mobjinfo[MT_HYUDOROGATE] = {
     deathsound = sfx_itpick,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
-    flags = MF_SPECIAL|MF_DONTENCOREMAP,
+    flags = MF_SPECIAL|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 --## Rawsets ##--
@@ -287,7 +287,6 @@ local function pickPairs()
 
                     setInfoMessage(p, "Teammate is " .. p2.name)
                     setInfoMessage(p2, "Teammate is " .. p.name)
-                    --print(("%s and %s should be skipped"):format(p.name, p.pm_friend.name))
                 end
             else
                 p.pm_friend = nil
@@ -327,7 +326,6 @@ local function pickPairs()
         p2.mo.color = TEAMCOLOURS[teamid]
         teamid = $+1
 
-        --print(("%s and %s are a pair"):format(p1.name, p2.name))
         S_StartSound(nil, sfx_strpst, p1)
         S_StartSound(nil, sfx_strpst, p2)
 
@@ -916,7 +914,6 @@ local function pairPointerThink(mo)
         local dist = R_PointToDist2(dp.mo.x, dp.mo.y, dp.pairmod.pair.mo.x, dp.pairmod.pair.mo.y)
         local new_trans_level = (7 - min(max(abs(FixedInt(FixedDiv(max(mosFix(dist) - (mosFix(SYNCBOOST_MAXDIST) / 2), 0), mosFix(SYNCBOOST_MAXDIST) / 16))), 0), 7)) + 2
         mo.frame = $ | (new_trans_level << 16)
-        print(new_trans_level)
     else
         mo.flags2 = $|MF2_DONTDRAW
     end
@@ -1105,7 +1102,7 @@ local function getItemPatchName(itemId)
     end
     if itemId == KITEM_INVINCIBILITY then
         --inv is shiny
-        return string.format("K_ISINV%d", (leveltime%(6*3))/3)
+        return string.format("K_ISINV%d", ((leveltime%(6*3))/3) + 1)
     end
     return K_GetItemPatch(itemId, true)
 end

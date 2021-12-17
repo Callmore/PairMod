@@ -13,6 +13,57 @@ local miniitemgfx
 local miniiteminvulgfx
 local sadgfx
 
+local scoreboard = nil
+
+-- Hooks
+local function cname(p)
+    if p.exiting <= 0 and p.pflags & PF_TIMEOVER == 0 then
+        return "\x86" .. p.name .. "\x80"
+    else
+        return p.name
+    end
+end
+
+local function scoreboardSortFunc(a, b)
+    return a.time < b.time
+end
+
+local function getScoreboard()
+    scoreboard = {}
+    local checkedPlayers = {}
+    for p in players.iterate do
+        if not checkedPlayers[#p] and p.pairmod then
+            local entry = {
+                names = {},
+                time = 0,
+            }
+            if p.pairmod.pair and p.pairmod.pair.valid then
+                entry.names = {cname(p), cname(p.pairmod.pair)}
+                entry.time = p.realtime
+                if p.pflags & PF_TIMEOVER > 0 or p.pairmod.pair.pflags & PF_TIMEOVER > 0 then
+                    entry.time = UINT32_MAX
+                elseif not pairmod.stopgamemode then
+                    entry.time = $ + p.pairmod.pair.realtime
+                end
+                checkedPlayers[#p] = true
+                checkedPlayers[#p.pairmod.pair] = true
+            else
+                entry.names = {cname(p)}
+                entry.time = p.realtime
+                if p.pflags & PF_TIMEOVER > 0 then
+                    entry.time = UINT32_MAX
+                elseif not pairmod.stopgamemode then
+                    entry.time = $ / 2
+                end
+                checkedPlayers[#p] = true
+            end
+            table.insert(scoreboard, entry)
+        end
+    end
+    table.sort(scoreboard, scoreboardSortFunc)
+end
+addHook("ThinkFrame", getScoreboard)
+
 -- Functions
 local function getItemPatchName(itemId)
     if xItemLib then
@@ -26,7 +77,19 @@ local function getItemPatchName(itemId)
 end
 
 local function toTimeString(tics)
+    if tics == UINT32_MAX then
+        return "--'--\"--"
+    end
     return string.format("%d'%02d\"%02d", G_TicsToMinutes(tics, true), G_TicsToSeconds(tics), G_TicsToCentiseconds(tics))
+end
+
+local function allDisplayPlayersExiting()
+    for dp in displayplayers.iterate do
+        if dp and dp.valid and not dp.spectator and (dp.exiting <= 0 or dp.pflags & PF_TIMEOVER) then
+            return false
+        end
+    end
+    return true
 end
 
 local function pairHud(v, p)
@@ -87,18 +150,18 @@ local function pairHud(v, p)
         if p.pairmod and p.pairmod.pair then
             str = "Your final time is the sum of both player's time"
         end
-        local strwidth = v.stringWidth(str, V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "thin")
-        v.drawString(160 - (strwidth / 2), 70, str, V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "thin")
+        local strwidth = v.stringWidth(str, V_ALLOWLOWERCASE|V_6WIDTHSPACE|V_HUDTRANS, "thin")
+        v.drawString(160 - (strwidth / 2), 140, str, V_ALLOWLOWERCASE|V_6WIDTHSPACE|V_HUDTRANS, "thin")
     end
 
     --## Post race scoreboard ##--
-    if pairmod.stopgamemode then
+    if pairmod.stopgamemode and p.splitscreenindex == 0 and allDisplayPlayersExiting() then
         v.drawString(160, 30, "Final ranking", V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "center")
 
-        if pairmod.eolScores ~= nil then
-            for i, k in ipairs(pairmod.eolScores) do
-                v.drawString(80, 33+(i*10), table.concat(k.playernames, " & "), V_ALLOWLOWERCASE|V_6WIDTHSPACE|V_HUDTRANS, "thin")
-                v.drawString(260, 33+(i*10), toTimeString(k.time), V_ALLOWLOWERCASE|V_HUDTRANS, "thin-right")
+        if scoreboard ~= nil then
+            for i, entry in ipairs(scoreboard) do
+                v.drawString(80, 33+(i*10), table.concat(entry.names, " & "), V_ALLOWLOWERCASE|V_6WIDTHSPACE|V_HUDTRANS, "thin")
+                v.drawString(260, 33+(i*10), toTimeString(entry.time), V_ALLOWLOWERCASE|V_HUDTRANS, "thin-right")
             end
         else
             v.drawString(160, 60, "None!", V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "center")

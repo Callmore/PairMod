@@ -170,7 +170,8 @@ local function resetVars(p)
         syncboostradiusindicator = nil,
         gatechain = 0,
         gatechainreset = 0,
-        teamid = nil
+        teamid = nil,
+        alreadyDidExit = false,
     }
 end
 
@@ -650,14 +651,26 @@ local function doGamemodeExit()
         end
     end
     table.sort(scores, scoreSortFunction)
-    pairmod.eolScores = processScores(scores)
+    local eolScores = processScores(scores)
 
     -- assign placements to players based on their pos
-    for i, k in ipairs(pairmod.eolScores) do
+    for i, k in ipairs(eolScores) do
         for i2, k2 in ipairs(k.players) do
             k2.kartstuff[k_position] = i
         end
     end
+end
+
+local function checkAndDoPlayerFinish(p)
+    local pm = p.pairmod
+
+    if not p.exiting and p.pflags & PF_TIMEOVER == 0 then return false end
+    if pm.alreadyDidExit then return true end
+    
+    --recordScore(p)
+    
+    pm.alreadyDidExit = true
+    return true
 end
 
 local function doGateSpawning(p)
@@ -789,6 +802,8 @@ local function playerThinker(p)
     if p.spectator then
         return
     end
+
+    if checkAndDoPlayerFinish(p) then return end
 
     -- no teammate? stop here
     if not (pm.pair

@@ -673,6 +673,14 @@ local function checkAndDoPlayerFinish(p)
     return true
 end
 
+local function checkForValidTeammate(p)
+    if p.pairmod.pair and p.pairmod.pair.valid and p.pairmod.pair.pairmod then
+        if p.pairmod.pair.pairmod.pair ~= p then
+            p.pairmod.pair = nil -- Remove pair
+        end
+    end
+end
+
 local function doGateSpawning(p)
     local pm = p.pairmod
 
@@ -804,6 +812,8 @@ local function playerThinker(p)
     end
 
     if checkAndDoPlayerFinish(p) then return end
+
+    checkForValidTeammate(p)
 
     -- no teammate? stop here
     if not (pm.pair

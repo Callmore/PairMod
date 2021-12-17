@@ -32,7 +32,7 @@ local function getScoreboard()
     scoreboard = {}
     local checkedPlayers = {}
     for p in players.iterate do
-        if not checkedPlayers[#p] and p.pairmod then
+        if not p.spectator and not checkedPlayers[#p] and p.pairmod then
             local entry = {
                 names = {},
                 time = 0,

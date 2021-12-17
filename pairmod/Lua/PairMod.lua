@@ -122,18 +122,20 @@ mobjinfo[MT_HYUDOROGATE] = {
 
 --## Rawsets ##--
 rawset(_G, "pairmod", {})
-pairmod.running = false
 
 --## Global variables ##--
-local pairmod_stopgamemode = false
-local pairmod_ranIntermission = true
+pairmod.running = false
+
+pairmod.stopgamemode = false
+pairmod.ranIntermission = true
+
+pairmod.infoMessage = ""
+pairmod.infoMessageTimer = 0
+
+pairmod.eolScores = nil
+
+-- Local globals
 local resetcolourcvars = nil
-
-local infoMessage = ""
-local infoMessageTimer = 0
-
-local eolScores = nil
-
 local cv_kartelimlast = nil
 local kartelimlast = nil
 
@@ -195,8 +197,8 @@ end
 
 local function setInfoMessage(p, str)
     if p == displayplayers[0] then
-        infoMessage = str
-        infoMessageTimer = INFO_MESSAGE_FADE_TIME
+        pairmod.infoMessage = str
+        pairmod.infoMessageTimer = INFO_MESSAGE_FADE_TIME
     end
 end
 
@@ -588,29 +590,29 @@ local function levelInit()
     end
 
     -- do start of level stuff
-    pairmod_stopgamemode = false
-    if consoleplayer == server and pairmod_ranIntermission then
+    pairmod.stopgamemode = false
+    if consoleplayer == server and pairmod.ranIntermission then
         if not cv_kartelimlast then
             cv_kartelimlast = CV_FindVar("karteliminatelast")
         end
         kartelimlast = cv_kartelimlast.string
         COM_BufInsertText(server, "karteliminatelast off")
     end
-    pairmod_ranIntermission = false
+    pairmod.ranIntermission = false
 end
 
 local function runInfoMessageTimer()
     --## Info message timer ##--
-    if infoMessageTimer then
-        infoMessageTimer = $-1
-        if not infoMessageTimer then
-            infoMessage = ""
+    if pairmod.infoMessageTimer then
+        pairmod.infoMessageTimer = $-1
+        if not pairmod.infoMessageTimer then
+            pairmod.infoMessage = ""
         end
     end
 end
 
 local function doGamemodeExit()
-    pairmod_stopgamemode = true
+    pairmod.stopgamemode = true
     cleanUpObjects()
     local pingame = playersInGame()
     local scores = {}
@@ -651,10 +653,10 @@ local function doGamemodeExit()
         end
     end
     table.sort(scores, scoreSortFunction)
-    eolScores = processScores(scores)
+    pairmod.eolScores = processScores(scores)
 
     -- assign placements to players based on their pos
-    for i, k in ipairs(eolScores) do
+    for i, k in ipairs(pairmod.eolScores) do
         for i2, k2 in ipairs(k.players) do
             k2.kartstuff[k_position] = i
         end
@@ -817,7 +819,7 @@ local function think()
     runInfoMessageTimer()
 
     -- KEEP THIS AFTER THE LEVELTIME CHECK OTHERWISE IT WILL BREAK!!!!!!!!!!!!!!
-    if pairmod_stopgamemode then
+    if pairmod.stopgamemode then
         return
     end
 
@@ -845,8 +847,8 @@ end
 addHook("ThinkFrame", think)
 
 local function intThink()
-    if pairmod_ranIntermission then return end
-    pairmod_ranIntermission = true
+    if pairmod.ranIntermission then return end
+    pairmod.ranIntermission = true
     if not pairmod.running then return end
     resetColours()
     if kartelimlast ~= nil then
@@ -858,7 +860,7 @@ addHook("IntermissionThinker", intThink)
 -- Object thinkers
 
 local function pairIndicatorThink(mo)
-    if pairmod_stopgamemode then
+    if pairmod.stopgamemode then
         P_RemoveMobj(mo)
         return
     end
@@ -886,7 +888,7 @@ end
 addHook("MobjThinker", pairIndicatorThink, MT_PAIR_MARKER)
 
 local function pairPointerThink(mo)
-    if pairmod_stopgamemode then
+    if pairmod.stopgamemode then
         P_RemoveMobj(mo)
         return
     end
@@ -1072,8 +1074,6 @@ addHook("TouchSpecial", hyudorogateSpecial, MT_HYUDOROGATE)
 -- NetVars
 local function netVars(net)
     pairmod = net($)
-    pairmod_stopgamemode = net($)
-    pairmod_ranIntermission = net($)
 end
 addHook("NetVars", netVars)
 
@@ -1151,13 +1151,13 @@ local function pairHud(v, p)
     end
 
     --## Info messages ##--
-    if infoMessageTimer then
-        local fadeLevel = (10 - FixedInt(FixedDiv(min(infoMessageTimer, INFO_MESSAGE_START_FADE), INFO_MESSAGE_START_FADE)*10)) * V_10TRANS
-        v.drawString(160, 161, infoMessage, fadeLevel|V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "center")
+    if pairmod.infoMessageTimer then
+        local fadeLevel = (10 - FixedInt(FixedDiv(min(pairmod.infoMessageTimer, INFO_MESSAGE_START_FADE), INFO_MESSAGE_START_FADE)*10)) * V_10TRANS
+        v.drawString(160, 161, pairmod.infoMessage, fadeLevel|V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "center")
     end
 
     --## Post race message ##--
-    if p.exiting and not pairmod_stopgamemode then
+    if p.exiting and not pairmod.stopgamemode then
         local str = "Your final time will be doubled to keep rankings fair"
         if p.pairmod and p.pairmod.pair then
             str = "Your final time is the sum of both player's time"
@@ -1167,11 +1167,11 @@ local function pairHud(v, p)
     end
 
     --## Post race scoreboard ##--
-    if pairmod_stopgamemode then
+    if pairmod.stopgamemode then
         v.drawString(160, 30, "Final ranking", V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "center")
 
-        if eolScores ~= nil then
-            for i, k in ipairs(eolScores) do
+        if pairmod.eolScores ~= nil then
+            for i, k in ipairs(pairmod.eolScores) do
                 v.drawString(80, 33+(i*10), table.concat(k.playernames, " & "), V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "thin")
                 v.drawString(260, 33+(i*10), toTimeString(k.time), V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "thin-right")
             end

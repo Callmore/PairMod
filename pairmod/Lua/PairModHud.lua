@@ -52,8 +52,8 @@ local function getScoreboard()
                 entry.time = p.realtime
                 if p.pflags & PF_TIMEOVER > 0 then
                     entry.time = UINT32_MAX
-                elseif pairmod.stopgamemode then
-                    entry.time = $ / 2
+                elseif not pairmod.stopgamemode then
+                    entry.time = $ * 2
                 end
                 checkedPlayers[#p] = true
             end

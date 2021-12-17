@@ -155,7 +155,7 @@ local function pairHud(v, p)
     end
 
     --## Post race scoreboard ##--
-    if pairmod.stopgamemode and p.splitscreenindex == 0 and allDisplayPlayersExiting() then
+    if pairmod.stopgamemode or (p.splitscreenindex == 0 and allDisplayPlayersExiting()) then
         v.drawString(160, 30, "Final ranking", V_ALLOWLOWERCASE|V_SNAPTOTOP|V_HUDTRANS, "center")
 
         if scoreboard ~= nil then

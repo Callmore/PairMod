@@ -430,8 +430,8 @@ local function trySetFriend(p, fr)
         fr.pm_friend = p
         fr.pm_tryfriend = nil
         fr.pm_askedfriend = nil
-        chatprintf(p, ("\x84You are now teammates with %s."):format(fr.name), true)
-        chatprintf(fr, ("\x84You are now teammates with %s."):format(p.name), true)
+        chatprintf(p, string.format("\x84You are now teammates with %s.", fr.name), true)
+        chatprintf(fr, string.format("\x84You are now teammates with %s.", p.name), true)
     elseif p.pm_friend then
         CONS_Printf(p, 'You already have a teammate! Enter "pm_resetteam" into the console to reset your teammate before attempting to team again.')
     elseif fr.pm_friend then
@@ -440,8 +440,8 @@ local function trySetFriend(p, fr)
     else
         p.pm_tryfriend = fr
         fr.pm_askedfriend = p
-        CONS_Printf(p, ('A team request has been sent to %s.'):format(fr.name))
-        chatprintf(fr, ('\x83%s is requesting to team with you. Enter "pm_acceptteam" into console to accept.'):format(p.name), true)
+        CONS_Printf(p, string.format('A team request has been sent to %s.', fr.name))
+        chatprintf(fr, string.format('\x83%s is requesting to team with you. Enter "pm_acceptteam" into console to accept.', p.name), true)
     end
 end
 
@@ -468,7 +468,7 @@ local function resetColours()
     end
 
     for i, k in ipairs(RESETCOLOURSSTR) do
-        COM_BufInsertText(consoleplayer, ('%s %d'):format(k, resetcolourcvars[i].value))
+        COM_BufInsertText(consoleplayer, string.format('%s %d', k, resetcolourcvars[i].value))
     end
 end
 
@@ -502,7 +502,7 @@ local function processScores(scores)
 end
 
 local function toTimeString(tics)
-    return ("%d\"%02d'%02d"):format(G_TicsToMinutes(tics, true), G_TicsToSeconds(tics), G_TicsToCentiseconds(tics))
+    return string.format("%d\"%02d'%02d", G_TicsToMinutes(tics, true), G_TicsToSeconds(tics), G_TicsToCentiseconds(tics))
 end
 
 --## Commands ## --
@@ -518,7 +518,7 @@ local function com_setFriend(p, ...)
         local num = tonumber(instr)
         if num >= 0 and num < #players
         and players[num] then
-            --CONS_Printf(p, ('Found "%s"'):format(players[num].name))
+            --CONS_Printf(p, string.format('Found "%s"', players[num].name))
             trySetFriend(p, players[num])
             return
         end
@@ -529,7 +529,7 @@ local function com_setFriend(p, ...)
     for i = 0, #players-1 do
         if players[i] and players[i].valid then
             if players[i].name:lower() == instr:lower() then
-                --CONS_Printf(p, ('Found "%s"'):format(players[i].name))
+                --CONS_Printf(p, string.format('Found "%s"', players[i].name))
                 trySetFriend(p, players[i])
                 return
             elseif players[i].name:lower():find(instr:lower(), 0, true) then
@@ -540,15 +540,15 @@ local function com_setFriend(p, ...)
 
     -- either set teammate or list all posible teammates
     if #foundplayers == 1 then
-        --CONS_Printf(p, ('Found "%s"'):format(foundplayers[1].name))
+        --CONS_Printf(p, string.format('Found "%s"', foundplayers[1].name))
         trySetFriend(p, foundplayers[1])
     elseif #foundplayers > 0 then
         CONS_Printf(p, "Found muliple players. Did you mean:")
         for i, pl in ipairs(foundplayers) do
-            CONS_Printf(p, ('- %s (Node %d)'):format(pl.name, #pl))
+            CONS_Printf(p, string.format('- %s (Node %d)', pl.name, #pl))
         end
     else
-        CONS_Printf(p, ('Could not find any players matching the term "%s".'):format(instr))
+        CONS_Printf(p, string.format('Could not find any players matching the term "%s".', instr))
     end
 end
 COM_AddCommand("pm_team", com_setFriend)
@@ -853,7 +853,7 @@ local function intThink()
     if not pairmod.running then return end
     resetColours()
     if kartelimlast ~= nil then
-        COM_BufInsertText(server, ('karteliminatelast "%s"'):format(kartelimlast))
+        COM_BufInsertText(server, string.format('karteliminatelast "%s"', kartelimlast))
     end
 end
 addHook("IntermissionThinker", intThink)

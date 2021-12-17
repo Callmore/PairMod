@@ -518,7 +518,6 @@ local function com_setFriend(p, ...)
         local num = tonumber(instr)
         if num >= 0 and num < #players
         and players[num] then
-            --CONS_Printf(p, string.format('Found "%s"', players[num].name))
             trySetFriend(p, players[num])
             return
         end
@@ -529,7 +528,6 @@ local function com_setFriend(p, ...)
     for i = 0, #players-1 do
         if players[i] and players[i].valid then
             if players[i].name:lower() == instr:lower() then
-                --CONS_Printf(p, string.format('Found "%s"', players[i].name))
                 trySetFriend(p, players[i])
                 return
             elseif players[i].name:lower():find(instr:lower(), 0, true) then
@@ -540,7 +538,6 @@ local function com_setFriend(p, ...)
 
     -- either set teammate or list all posible teammates
     if #foundplayers == 1 then
-        --CONS_Printf(p, string.format('Found "%s"', foundplayers[1].name))
         trySetFriend(p, foundplayers[1])
     elseif #foundplayers > 0 then
         CONS_Printf(p, "Found muliple players. Did you mean:")

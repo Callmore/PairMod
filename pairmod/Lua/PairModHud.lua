@@ -52,7 +52,7 @@ local function getScoreboard()
                 entry.time = p.realtime
                 if p.pflags & PF_TIMEOVER > 0 then
                     entry.time = UINT32_MAX
-                elseif not pairmod.stopgamemode then
+                elseif pairmod.stopgamemode then
                     entry.time = $ / 2
                 end
                 checkedPlayers[#p] = true
@@ -85,7 +85,7 @@ end
 
 local function allDisplayPlayersExiting()
     for dp in displayplayers.iterate do
-        if dp and dp.valid and not dp.spectator and (dp.exiting <= 0 or dp.pflags & PF_TIMEOVER) then
+        if dp and dp.valid and (dp.exiting <= 0 or dp.pflags & PF_TIMEOVER) or dp.spectator then
             return false
         end
     end

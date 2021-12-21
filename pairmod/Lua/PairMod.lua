@@ -681,6 +681,26 @@ local function checkForValidTeammate(p)
     end
 end
 
+local function doShrinkMod(p)
+    local pm = p.pairmod
+    
+    -- Shrink
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and pm.lastitemtype == KITEM_SHRINK
+    and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
+    and not p.kartstuff[k_stolentimer] then
+        if pm.pair and pm.pair.valid and pm.pair.kartstuff[k_growshrinktimer] < 0 then
+            pm.pair.kartstuff[k_growshrinktimer] = $ / 4
+        end
+        for ip in players.iterate do
+            if ip and ip.valid and ip.mo and ip.mo.valid and ip ~= p and ip ~= pm.pair and ip.kartstuff[k_position] < p.kartstuff[k_position] then
+                -- Someone is going to complain about this but it's to make shrink less bad...
+                K_SpinPlayer(ip, p.mo, 1)
+            end
+        end
+    end
+end
+
 local function doGateSpawning(p)
     local pm = p.pairmod
 
@@ -814,6 +834,8 @@ local function playerThinker(p)
     if checkAndDoPlayerFinish(p) then return end
 
     checkForValidTeammate(p)
+
+    doShrinkMod(p)
 
     -- no teammate? stop here
     if not (pm.pair

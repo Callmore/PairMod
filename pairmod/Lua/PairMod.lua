@@ -1124,13 +1124,19 @@ local ITEM_DONT_COLLIDE = {
     [MT_EGGMANITEM_SHIELD] = true,
 }
 
+local function checkHeight(mo, other)
+    return ((mo.z >= other.z and mo.z < other.z + other.height)
+        or (other.z >= mo.z and other.z < mo.z + mo.height))
+end
+
 local function playerItemCollide(pmo, mo)
     if pmo and pmo.valid and mo and mo.valid then
         if ITEM_DONT_COLLIDE[mo.type]
         and pmo.player and pmo.player.valid
         and pmo.player.pairmod and pmo.player.pairmod.pair
         and mo.target and mo.target.valid
-        and pmo.player.pairmod.pair == mo.target.player then
+        and pmo.player.pairmod.pair == mo.target.player
+        and checkHeight(pmo, mo) then
             return true
         end
     end
@@ -1139,14 +1145,14 @@ end
 
 local function itemCollide(mo, other)
     if mo and mo.valid and other and other.valid then
-        print(#other.player)
         if ITEM_DONT_COLLIDE[other.type] 
         and mo.target and mo.target.valid
         and mo.target.player and mo.target.player.valid
         and mo.target.player.pairmod and mo.target.player.pairmod.pair
         and other.target and other.target.valid
         and other.target.player
-        and mo.target.player.pairmod.pair == other.target.player then
+        and mo.target.player.pairmod.pair == other.target.player
+        and checkHeight(mo, other) then
             return false
         end
     end

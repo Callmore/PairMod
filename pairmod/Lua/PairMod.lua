@@ -1093,6 +1093,76 @@ local function hyudorogateSpecial(mo, toucher)
 end
 addHook("TouchSpecial", hyudorogateSpecial, MT_HYUDOROGATE)
 
+-- Items
+local ITEM_DONT_COLLIDE = {
+    [MT_ORBINAUT_SHIELD] = true,
+    [MT_JAWZ_SHIELD] = true,
+    [MT_MINE] = true,
+    [MT_BANANA_SHIELD] = true,
+    [MT_EGGMANITEM_SHIELD] = true,
+}
+
+local function playerItemCollide(pmo, mo)
+    if pmo and pmo.valid and mo and mo.valid then
+        if ITEM_DONT_COLLIDE[mo.type]
+        and pmo.player and pmo.player.valid
+        and pmo.player.pairmod and pmo.player.pairmod.pair
+        and mo.target and mo.target.valid
+        and pmo.player.pairmod.pair == mo.target.player then
+            return true
+        end
+    end
+end
+
+
+local function itemCollide(mo, other)
+    if mo and mo.valid and other and other.valid then
+        print(#other.player)
+        if ITEM_DONT_COLLIDE[other.type] 
+        and mo.target and mo.target.valid
+        and mo.target.player and mo.target.player.valid
+        and mo.target.player.pairmod and mo.target.player.pairmod.pair
+        and other.target and other.target.valid
+        and other.target.player
+        and mo.target.player.pairmod.pair == other.target.player then
+            return false
+        end
+    end
+end
+
+local function itemTouchSpecial(pmo, mo)
+    if ITEM_DONT_COLLIDE[mo.type] and pmo and pmo.valid and pmo.player and pmo.player.valid
+    and pmo.player.pairmod and pmo.player.pairmod.pair
+    and mo and mo.valid and mo.target and mo.target.valid
+    and pmo.player.pairmod.pair == mo.target.player then
+        return true
+    end
+end
+
+local function itemShouldDamange(pmo, mo)
+    if ITEM_DONT_COLLIDE[mo.type] and pmo and pmo.valid and pmo.player and pmo.player.valid
+    and pmo.player.pairmod and pmo.player.pairmod.pair
+    and mo and mo.valid and mo.target and mo.target.valid
+    and pmo.player.pairmod.pair == mo.target.player then
+        return false
+    end
+end
+
+local ITEM_DONT_COLLIDE_APPLIED = {
+    MT_ORBINAUT_SHIELD,
+    MT_JAWZ_SHIELD,
+    MT_MINE,
+    MT_BANANA_SHIELD,
+    MT_EGGMANITEM_SHIELD,
+}
+addHook("MobjCollide", playerItemCollide, MT_PLAYER)
+for _, k in ipairs(ITEM_DONT_COLLIDE_APPLIED) do
+    addHook("MobjCollide", itemCollide, k)
+    addHook("TouchSpecial", itemTouchSpecial, k)
+end
+addHook("ShouldDamage", itemShouldDamange, MT_PLAYER)
+
+
 -- NetVars
 local function netVars(net)
     pairmod = net($)

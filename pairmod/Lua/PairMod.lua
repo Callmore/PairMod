@@ -970,6 +970,8 @@ local function pairPointerThink(mo)
         mo.color = dp.pairmod.pair.mo.color
         mo.skin = dp.pairmod.pair.mo.skin
         mo.angle = dp.pairmod.pair.frameangle
+        mo.colorized = dp.pairmod.pair.mo.colorized
+        mo.frame = dp.pairmod.pair.mo.frame
         mo.flags2 = $&(~MF2_DONTDRAW)
 
         -- Get transparency

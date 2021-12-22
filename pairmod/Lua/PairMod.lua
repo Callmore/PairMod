@@ -35,7 +35,7 @@ freeslot(
     "S_PAIR_POINTER", "MT_PAIR_POINTER",
     "S_PAIR_MARKER", "S_PAIR_MARKER_TRANS", "MT_PAIR_MARKER",
     "S_SYNC_MAXDIST", "MT_SYNC_MAXDIST",
-    "S_SYNCBOOST_EFFECT_1", "S_SYNCBOOST_EFFECT_2", "MT_SYNCBOOST_EFFECT",
+    "MT_SYNCBOOST_EFFECT",
     "S_SNEAKERGATE", "MT_SNEAKERGATE",
     "S_INVINCGATE", "MT_INVINCGATE",
     "S_GROWGATE", "MT_GROWGATE",
@@ -72,10 +72,8 @@ mobjinfo[MT_SYNC_MAXDIST] = {
     flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
-states[S_SYNCBOOST_EFFECT_1] = {SPR_SYNC, FF_FULLBRIGHT|A, -1, nil, 0, 0, S_SYNCBOOST_EFFECT_1}
-states[S_SYNCBOOST_EFFECT_2] = {SPR_SYNC, FF_FULLBRIGHT|B, -1, nil, 0, 0, S_SYNCBOOST_EFFECT_2}
 mobjinfo[MT_SYNCBOOST_EFFECT] = {
-    spawnstate = S_SYNCBOOST_EFFECT_1,
+    spawnstate = S_KARMAFIREWORK1,
     spawnhealth = 1000,
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
@@ -180,7 +178,7 @@ local function resetVars(p)
         lastsneakertimer = nil,
         lastrocketsneakertimer = nil,
         syncboost = 0,
-        syncboostindicator = nil,
+        syncboostindicator = {},
         syncboostradiusindicator = nil,
         gatechain = 0,
         gatechainreset = 0,
@@ -378,10 +376,6 @@ local function cleanUpObjects()
                 P_RemoveMobj(p.pairmod.pairpointer)
                 p.pairmod.pairpointer = nil
             end
-            if p.pairmod.syncboostindicator and p.pairmod.syncboostindicator.valid then
-                P_RemoveMobj(p.pairmod.syncboostindicator)
-                p.pairmod.syncboostindicator = nil
-            end
             if p.pairmod.syncboostradiusindicator and p.pairmod.syncboostradiusindicator.valid then
                 P_RemoveMobj(p.pairmod.syncboostradiusindicator)
                 p.pairmod.syncboostradiusindicator = nil
@@ -402,13 +396,11 @@ local function spawnGate(p, gatetype)
     return gate
 end
 
-local function spawnMaxRangeIndicator(p)
-    local mo = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_SYNCBOOST_EFFECT)
-    mo.color = p.skincolor
-    mo.scale = p.mo.scale / 2
-    if p.pairmod.syncboostword then
-        mo.state = S_SYNCBOOST_EFFECT_2
-    end
+local function spawnMaxRangeIndicator(p, i)
+    local mo = P_SpawnMobj(p.pairmod.pair.mo.x, p.pairmod.pair.mo.y, p.pairmod.pair.mo.z, MT_SYNCBOOST_EFFECT)
+    mo.color = p.pairmod.pair.skincolor
+    --mo.scale = p.mo.scale / 2
+    mo.pairmod_syncboostId = i
     mo.target = p.mo
     return mo
 end
@@ -788,8 +780,10 @@ local function doSyncboost(p)
                 S_StartSound(p.mo, sfx_s23c)
             end
 
-            if not (pm.syncboostindicator and pm.syncboostindicator.valid) then
-                pm.syncboostindicator = spawnMaxRangeIndicator(p)
+            for i = 1, pm.syncboost / TICRATE do
+                if not (pm.syncboostindicator[i] and pm.syncboostindicator[i].valid) then
+                    pm.syncboostindicator[i] = spawnMaxRangeIndicator(p, i)
+                end
             end
         elseif pm.syncboost then
             pm.syncboost = max($-1, 0)
@@ -1017,20 +1011,28 @@ addHook("MobjThinker", syncBoostRadiusIndicatorThinker, MT_SYNC_MAXDIST)
 
 local function syncBoostEffectThinker(mo)
     local pmo = mo.target
-    if pmo and pmo.valid
-    and pmo.player and pmo.player.valid
-    and pmo.player.pairmod
-    and pmo.player.pairmod.syncboost > 0
-    and pmo.player.pairmod.pair and pmo.player.pairmod.pair.valid
-    and pmo.player.pairmod.pair.mo and pmo.player.pairmod.pair.mo.valid then
-        local p = pmo.player
-        local timemul = FixedDiv(p.pairmod.syncboost, SYNCBOOST_MAXBOOST)
-        local ang = R_PointToAngle2(pmo.x, pmo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y)
-        local dist = R_PointToDist2(pmo.x, pmo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y)
-        P_TeleportMove(mo, pmo.x + FixedMul(FixedMul(sin(ang+ANGLE_90), dist), timemul/2),
-                           pmo.y + FixedMul(FixedMul(cos(ang+ANGLE_90), -dist), timemul/2),
-                           pmo.z + FixedMul(p.pairmod.pair.mo.z - pmo.z, timemul/2))
-        mo.flags2 = $&(~MF2_DONTDRAW)
+    if pmo and pmo.valid and pmo.player and pmo.player.valid and pmo.player.pairmod and (pmo.player.pairmod.syncboost / TICRATE) >= mo.pairmod_syncboostId then
+        local trail = P_SpawnMobj(mo.x, mo.y, mo.z, MT_THOK)
+        trail.state = S_KARMAFIREWORKTRAIL
+        trail.scale = mo.scale
+        trail.destscale = 1
+        trail.scalespeed = mo.scale/12
+        trail.color = mo.color
+
+        -- Figure out tp point
+        local rot = (leveltime * ANG2) + FixedAngle(mo.pairmod_syncboostId * (360 / (pmo.player.pairmod.syncboost / TICRATE)) * FRACUNIT)
+        local new_x = pmo.x + FixedMul(cos(rot) * 48, mapobjectscale)
+        local new_y = pmo.y + FixedMul(sin(rot) * 48, mapobjectscale)
+        local new_z = pmo.z
+
+        -- Teleport!
+        local dist_x = new_x - mo.x
+        local dist_y = new_y - mo.y
+        local dist_z = new_z - mo.z
+
+        mo.momx = FixedMul(FixedMul(dist_x, mapobjectscale), 4*FRACUNIT/10)
+        mo.momy = FixedMul(FixedMul(dist_y, mapobjectscale), 4*FRACUNIT/10)
+        mo.momz = FixedMul(FixedMul(dist_z, mapobjectscale), 4*FRACUNIT/10)
     else
         P_RemoveMobj(mo)
     end

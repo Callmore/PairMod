@@ -1,0 +1,27 @@
+local function setItemOdds(item, newOdds)
+    xItemLib.xItemOddsRace[item] = newOdds
+    xItemLib.xItemData[item].defaultRaceOdds = newOdds
+end
+
+setItemOdds(KITEM_SNEAKER,         {1, 0, 1, 1, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_ROCKETSNEAKER,   {0, 0, 0, 0, 0, 0, 6, 1, 4, 0})
+setItemOdds(KITEM_INVINCIBILITY,   {0, 0, 0, 0, 0, 0, 3, 2, 4, 0})
+setItemOdds(KITEM_BANANA,          {0, 2, 0, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_EGGMAN,          {0, 1, 1, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_ORBINAUT,        {0, 4, 1, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_JAWZ,            {0, 0, 1, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_MINE,            {0, 0, 2, 2, 1, 1, 0, 0, 0, 0})
+setItemOdds(KITEM_BALLHOG,         {0, 0, 0, 0, 1, 1, 0, 0, 0, 0})
+setItemOdds(KITEM_SPB,             {0, 0, 0, 1, 1, 1, 1, 0, 0, 1})
+setItemOdds(KITEM_GROW,            {0, 0, 0, 0, 0, 0, 2, 2, 1, 0})
+setItemOdds(KITEM_SHRINK,          {0, 0, 0, 0, 0, 0, 3, 1, 0, 0})
+setItemOdds(KITEM_THUNDERSHIELD,   {0, 1, 0, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_HYUDORO,         {0, 0, 0, 0, 1, 1, 2, 1, 0, 0})
+setItemOdds(KITEM_POGOSPRING,      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KITEM_KITCHENSINK,     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KRITEM_TRIPLESNEAKER,  {0, 0, 0, 0, 1, 1, 0, 0, 0, 0})
+setItemOdds(KRITEM_TRIPLEBANANA,   {0, 0, 0, 1, 0, 0, 0, 0, 0, 0})
+setItemOdds(KRITEM_TENFOLDBANANA,  {0, 0, 0, 0, 1, 0, 0, 0, 0, 0})
+setItemOdds(KRITEM_TRIPLEORBINAUT, {0, 0, 0, 1, 2, 2, 2, 0, 0, 0})
+setItemOdds(KRITEM_QUADORBINAUT,   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+setItemOdds(KRITEM_DUALJAWZ,       {0, 0, 0, 1, 2, 2, 2, 0, 0, 0})

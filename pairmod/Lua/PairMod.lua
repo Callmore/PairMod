@@ -384,22 +384,29 @@ local function cleanUpObjects()
     end
 end
 
+local function isInSyncboostRange(p, other)
+    return R_PointToDist2(p.mo.x, p.mo.y, p.pairmod.pair.mo.x, p.pairmod.pair.mo.y) <= mosFix(SYNCBOOST_MAXDIST)
+end
+
 -- Object spawning functions
 
 local function spawnGate(p, gatetype)
-    local gate = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, gatetype)
-    gate.fuse = TICRATE*15
-    gate.targetplayer = p.pairmod.pair
-    gate.scale = FixedMul($, FRACUNIT*3)
-    gate.angle = p.mo.angle + ANGLE_90
-    gate.flags2 = $|MF2_DONTDRAW
-    return gate
+    if isInSyncboostRange(p, p.pairmod.pair) then
+        pairmod.gateFunctions[gatetype](p.pairmod.pair.mo, false)
+    else
+        local gate = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, gatetype)
+        gate.fuse = TICRATE*15
+        gate.targetplayer = p.pairmod.pair
+        gate.scale = FixedMul($, FRACUNIT*3)
+        gate.angle = p.mo.angle + ANGLE_90
+        gate.flags2 = $|MF2_DONTDRAW
+        return gate
+    end
 end
 
 local function spawnMaxRangeIndicator(p, i)
     local mo = P_SpawnMobj(p.pairmod.pair.mo.x, p.pairmod.pair.mo.y, p.pairmod.pair.mo.z, MT_SYNCBOOST_EFFECT)
     mo.color = p.pairmod.pair.skincolor
-    --mo.scale = p.mo.scale / 2
     mo.pairmod_syncboostId = i
     mo.target = p.mo
     return mo
@@ -770,8 +777,7 @@ local function doSyncboost(p)
     local pm = p.pairmod
 
     if leveltime > STARTTIME + (TICRATE * 5) then
-        local dist = R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
-        if dist <= mosFix(SYNCBOOST_MAXDIST) then
+        if isInSyncboostRange(p, pm.pair) then
             local lastsync = pm.syncboost
             pm.syncboost = min($+1, SYNCBOOST_MAXBOOST)
 
@@ -1042,6 +1048,65 @@ addHook("MobjThinker", syncBoostEffectThinker, MT_SYNCBOOST_EFFECT)
 
 -- Gates
 
+-- Gate functions
+pairmod.gateFunctions = {
+    [MT_SNEAKERGATE] = function (pmo, gate)
+        K_DoSneaker(pmo.player)
+        if gate then
+            doGateChain(pmo.player)
+            setInfoMessage(pmo.player.pairmod.pair, "Teammate used your sneaker gate!")
+        end
+    end,
+    [MT_INVINCGATE] = function (pmo, gate)
+        if not pmo.player.kartstuff[k_invincibilitytimer] then
+            local overlay = P_SpawnMobj(pmo.x, pmo.y, pmo.z, MT_INVULNFLASH)
+            overlay.target = pmo
+            overlay.destscale = pmo.scale
+            overlay.scale = pmo.scale
+        end
+        pmo.player.kartstuff[k_invincibilitytimer] = 10*TICRATE
+        P_RestoreMusic(pmo.player)
+        if not isLocalPlayer(pmo.player) then
+            S_StartSound(pmo, (CV_FindVar("kartinvinsfx").value and sfx_alarmi or sfx_kinvnc))
+        end
+        K_PlayPowerGloatSound(pmo)
+        if gate then
+            doGateChain(pmo.player)
+            setInfoMessage(pmo.player.pairmod.pair, "Teammate used your invincibility gate!")
+        end
+    end,
+    [MT_GROWGATE] = function (pmo, gate)
+        if pmo.player.kartstuff[k_growshrinktimer] < 0 then -- If you're shrunk, then "grow" will just make you normal again.
+            removeGrowShrink(pmo.player)
+        else
+            K_PlayPowerGloatSound(pmo)
+            pmo.scalespeed = mapobjectscale/TICRATE
+            pmo.destscale = (3*mapobjectscale)/2
+            if CV_FindVar("kartdebugshrink").value then
+                pmo.destscale = (6*pmo.destscale)/8
+            end
+            pmo.player.kartstuff[k_growshrinktimer] = 12*TICRATE
+            P_RestoreMusic(pmo.player)
+            if not isLocalPlayer(pmo.player) then
+                S_StartSound(pmo, (CV_FindVar("kartinvinsfx").value and sfx_alarmg or sfx_kgrow))
+            end
+            S_StartSound(pmo, sfx_kc5a)
+        end
+        if gate then
+            doGateChain(pmo.player)
+            setInfoMessage(pmo.player.pairmod.pair, "Teammate used your grow gate!")
+        end
+    end,
+    [MT_HYUDOROGATE] = function (pmo, gate)
+        pmo.player.kartstuff[k_hyudorotimer] = 7*TICRATE
+        S_StartSound(pmo, sfx_s3k92)
+        if gate then
+            doGateChain(pmo.player)
+            setInfoMessage(pmo.player.pairmod.pair, "Teammate used your hyudoro gate!")
+        end
+    end,
+}
+
 local function gateThink(mo)
     local dp = displayplayers[0]
     if mo.targetplayer == dp
@@ -1058,80 +1123,18 @@ addHook("MobjThinker", gateThink, MT_INVINCGATE)
 addHook("MobjThinker", gateThink, MT_GROWGATE)
 addHook("MobjThinker", gateThink, MT_HYUDOROGATE)
 
-local function sneakergateSpecial(mo, toucher)
+local function gateTouchSpecial(mo, toucher)
     if toucher and toucher.valid and toucher.player and toucher.player.valid
     and toucher.player == mo.targetplayer then
-        K_DoSneaker(toucher.player)
-        doGateChain(toucher.player)
-        setInfoMessage(toucher.player.pairmod.pair, "Teammate used your sneaker gate!")
+        pairmod.gateFunctions[mo.type](toucher, true)
         P_RemoveMobj(mo)
     end
     return true
 end
-addHook("TouchSpecial", sneakergateSpecial, MT_SNEAKERGATE)
-
-local function invincgateSpecial(mo, toucher)
-    if toucher and toucher.valid and toucher.player and toucher.player.valid
-    and toucher.player == mo.targetplayer then
-        if not toucher.player.kartstuff[k_invincibilitytimer] then
-            local overlay = P_SpawnMobj(toucher.x, toucher.y, toucher.z, MT_INVULNFLASH)
-            overlay.target = toucher
-            overlay.destscale = toucher.scale
-            overlay.scale = toucher.scale
-        end
-        toucher.player.kartstuff[k_invincibilitytimer] = 10*TICRATE
-        P_RestoreMusic(toucher.player)
-        if not isLocalPlayer(toucher.player) then
-            S_StartSound(toucher, (CV_FindVar("kartinvinsfx").value and sfx_alarmi or sfx_kinvnc))
-        end
-        K_PlayPowerGloatSound(toucher)
-        doGateChain(toucher.player)
-        setInfoMessage(toucher.player.pairmod.pair, "Teammate used your invincibility gate!")
-        P_RemoveMobj(mo)
-    end
-    return true
-end
-addHook("TouchSpecial", invincgateSpecial, MT_INVINCGATE)
-
-local function growgateSpecial(mo, toucher)
-    if toucher and toucher.valid and toucher.player and toucher.player.valid
-    and toucher.player == mo.targetplayer then
-        if toucher.player.kartstuff[k_growshrinktimer] < 0 then -- If you're shrunk, then "grow" will just make you normal again.
-            removeGrowShrink(toucher.player)
-        else
-            K_PlayPowerGloatSound(toucher)
-            toucher.scalespeed = mapobjectscale/TICRATE
-            toucher.destscale = (3*mapobjectscale)/2
-            if CV_FindVar("kartdebugshrink").value then
-                toucher.destscale = (6*toucher.destscale)/8
-            end
-            toucher.player.kartstuff[k_growshrinktimer] = 12*TICRATE
-            P_RestoreMusic(toucher.player)
-            if not isLocalPlayer(toucher.player) then
-                S_StartSound(toucher, (CV_FindVar("kartinvinsfx").value and sfx_alarmg or sfx_kgrow))
-            end
-            S_StartSound(toucher, sfx_kc5a)
-        end
-        doGateChain(toucher.player)
-        setInfoMessage(toucher.player.pairmod.pair, "Teammate used your grow gate!")
-        P_RemoveMobj(mo)
-    end
-    return true
-end
-addHook("TouchSpecial", growgateSpecial, MT_GROWGATE)
-
-local function hyudorogateSpecial(mo, toucher)
-    if toucher and toucher.valid and toucher.player and toucher.player.valid
-    and toucher.player == mo.targetplayer then
-        toucher.player.kartstuff[k_hyudorotimer] = 7*TICRATE
-        S_StartSound(toucher, sfx_s3k92)
-        doGateChain(toucher.player)
-        setInfoMessage(toucher.player.pairmod.pair, "Teammate used your hyudoro gate!")
-        P_RemoveMobj(mo)
-    end
-    return true
-end
-addHook("TouchSpecial", hyudorogateSpecial, MT_HYUDOROGATE)
+addHook("TouchSpecial", gateTouchSpecial, MT_SNEAKERGATE)
+addHook("TouchSpecial", gateTouchSpecial, MT_INVINCGATE)
+addHook("TouchSpecial", gateTouchSpecial, MT_GROWGATE)
+addHook("TouchSpecial", gateTouchSpecial, MT_HYUDOROGATE)
 
 -- Items
 local ITEM_DONT_COLLIDE = {

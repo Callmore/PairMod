@@ -931,8 +931,14 @@ local function pairIndicatorThink(mo)
     and dp.pairmod.pair.mo and dp.pairmod.pair.mo.valid then
         -- AND NOW TELEPORT!
         local pmo = dp.pairmod.pair.mo
+
+        mo.eflags = (mo.eflags & ~MFE_VERTICALFLIP) | (pmo.eflags & MFE_VERTICALFLIP)
+        mo.flags2 = (mo.flags2 & ~MF2_OBJECTFLIP) | (pmo.flags2 & MF2_OBJECTFLIP)
+
+
         P_TeleportMove(mo, pmo.x, pmo.y, pmo.z)
         mo.flags2 = $&(~MF2_DONTDRAW)
+        mo.color = pmo.color
 
         if R_PointToDist2(dp.mo.x, dp.mo.y, pmo.x, pmo.y) < mosFix(SYNCBOOST_MAXDIST) then
             mo.state = S_PAIR_MARKER_TRANS

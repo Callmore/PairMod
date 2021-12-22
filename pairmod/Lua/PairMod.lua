@@ -769,7 +769,7 @@ end
 local function doSyncboost(p)
     local pm = p.pairmod
 
-    if leveltime > STARTTIME then
+    if leveltime > STARTTIME + (TICRATE * 5) then
         local dist = R_PointToDist2(p.mo.x, p.mo.y, pm.pair.mo.x, pm.pair.mo.y)
         if dist <= mosFix(SYNCBOOST_MAXDIST) then
             local lastsync = pm.syncboost
@@ -974,6 +974,7 @@ addHook("MobjThinker", pairPointerThink, MT_PAIR_POINTER)
 local function syncBoostRadiusIndicatorThinker(mo)
     local dp = displayplayers[mo.pm_indexwatch - 1]
     if cv_showRangeFrom.value ~= 0
+    and leveltime > STARTTIME + (5 * TICRATE)
     and dp and dp.valid
     and dp.mo and dp.mo.valid
     and dp.pairmod
@@ -1040,6 +1041,7 @@ end
 addHook("MobjThinker", syncBoostEffectThinker, MT_SYNCBOOST_EFFECT)
 
 -- Gates
+
 local function gateThink(mo)
     local dp = displayplayers[0]
     if mo.targetplayer == dp
@@ -1157,7 +1159,6 @@ local function playerItemCollide(pmo, mo)
         end
     end
 end
-
 
 local function itemCollide(mo, other)
     if mo and mo.valid and other and other.valid then

@@ -39,7 +39,8 @@ freeslot(
     "S_SNEAKERGATE", "MT_SNEAKERGATE",
     "S_INVINCGATE", "MT_INVINCGATE",
     "S_GROWGATE", "MT_GROWGATE",
-    "S_HYUDOROGATE", "MT_HYUDOROGATE"
+    "S_HYUDOROGATE", "MT_HYUDOROGATE",
+    "S_SPBNUMBER_1", "S_SPBNUMBER_2", "S_SPBNUMBER_3", "S_SPBNUMBER_4", "S_SPBNUMBER_5", "MT_PAIRMOD_SPBNUMBERS"
 )
 
 
@@ -119,6 +120,19 @@ mobjinfo[MT_HYUDOROGATE] = {
     radius = 32*FRACUNIT,
     height = 32*FRACUNIT,
     flags = MF_SPECIAL|MF_NOGRAVITY|MF_DONTENCOREMAP,
+}
+
+states[S_SPBNUMBER_1] = {SPR_DRWN, 1|TR_TRANS30, TICRATE, nil, 0, 0, S_NULL}
+states[S_SPBNUMBER_2] = {SPR_DRWN, 2|TR_TRANS30, TICRATE, nil, 0, 0, S_NULL}
+states[S_SPBNUMBER_3] = {SPR_DRWN, 3|TR_TRANS30, TICRATE, nil, 0, 0, S_NULL}
+states[S_SPBNUMBER_4] = {SPR_DRWN, 4|TR_TRANS30, TICRATE, nil, 0, 0, S_NULL}
+states[S_SPBNUMBER_5] = {SPR_DRWN, 5|TR_TRANS30, TICRATE, nil, 0, 0, S_NULL}
+mobjinfo[MT_PAIRMOD_SPBNUMBERS] = {
+    spawnstate = S_SPBNUMBER_1,
+    spawnhealth = 1000,
+    radius = 1*FRACUNIT,
+    height = 1*FRACUNIT,
+    flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
 --## Rawsets ##--
@@ -1190,6 +1204,47 @@ for _, k in ipairs(ITEM_DONT_COLLIDE_APPLIED) do
 end
 addHook("ShouldDamage", itemShouldDamange, MT_PLAYER)
 
+
+-- SPB Modifications
+local function SPBMod(mo)
+    --print(FixedInt(mo.movefactor))
+    if mo.extravalue1 == 1 then
+        mo.pairmod_spbTimer = ($ + 1) or 0
+
+        if mo.pairmod_spbTimer >= 3*TICRATE and mo.pairmod_spbTimer % TICRATE == 0 and mo.pairmod_spbTimer < 8*TICRATE then
+            local n = 7 - (mo.pairmod_spbTimer / TICRATE)
+
+            local numbermobj = P_SpawnMobj(mo.x, mo.y, mo.z + (32 * mapobjectscale * P_MobjFlip(mo)), MT_PAIRMOD_SPBNUMBERS)
+            numbermobj.state = S_SPBNUMBER_1 + n
+            numbermobj.target = mo
+            numbermobj.scale = $ * 2
+
+            S_StartSound(mo, sfx_buzz3)
+        end
+
+        if mo.pairmod_spbTimer >= 8*TICRATE then
+            mo.colorized = true
+            mo.momx = FixedMul($, 3*FRACUNIT/2)
+            mo.momy = FixedMul($, 3*FRACUNIT/2)
+            mo.momz = FixedMul($, 3*FRACUNIT/2)
+        end
+    else
+        mo.pairmod_spbTimer = 0
+    end
+end
+addHook("MobjThinker", SPBMod, MT_SPB)
+
+local function SPBNumberThinker(mo)
+    if not (mo.target and mo.target.valid) then
+        P_RemoveMobj(mo)
+        return
+    end
+
+    K_MatchGenericExtraFlags(mo, mo.target)
+
+    P_TeleportMove(mo, mo.target.x, mo.target.y, mo.target.z + (72 * mapobjectscale * P_MobjFlip(mo)))
+end
+addHook("MobjThinker", SPBNumberThinker, MT_PAIRMOD_SPBNUMBERS)
 
 -- NetVars
 local function netVars(net)

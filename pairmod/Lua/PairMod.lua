@@ -392,7 +392,7 @@ end
 
 local function spawnGate(p, gatetype)
     if isInSyncboostRange(p, p.pairmod.pair) then
-        pairmod.gateFunctions[gatetype](p.pairmod.pair.mo, false)
+        pairmodGateFunctions[gatetype](p.pairmod.pair.mo, false)
     else
         local gate = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, gatetype)
         gate.fuse = TICRATE*15
@@ -1057,7 +1057,7 @@ addHook("MobjThinker", syncBoostEffectThinker, MT_SYNCBOOST_EFFECT)
 -- Gates
 
 -- Gate functions
-pairmod.gateFunctions = {
+rawset(_G, "pairmodGateFunctions", {
     [MT_SNEAKERGATE] = function (pmo, gate)
         K_DoSneaker(pmo.player)
         if gate then
@@ -1113,7 +1113,7 @@ pairmod.gateFunctions = {
             setInfoMessage(pmo.player.pairmod.pair, "Teammate used your hyudoro gate!")
         end
     end,
-}
+})
 
 local function gateThink(mo)
     local dp = displayplayers[0]
@@ -1134,7 +1134,7 @@ addHook("MobjThinker", gateThink, MT_HYUDOROGATE)
 local function gateTouchSpecial(mo, toucher)
     if toucher and toucher.valid and toucher.player and toucher.player.valid
     and toucher.player == mo.targetplayer then
-        pairmod.gateFunctions[mo.type](toucher, true)
+        pairmodGateFunctions[mo.type](toucher, true)
         P_RemoveMobj(mo)
     end
     return true
@@ -1196,9 +1196,10 @@ local function itemTouchSpecial(pmo, mo)
 end
 
 local function itemShouldDamange(pmo, mo)
-    if ITEM_DONT_COLLIDE[mo.type] and pmo and pmo.valid and pmo.player and pmo.player.valid
+    if mo and mo.valid and ITEM_DONT_COLLIDE[mo.type]
+    and pmo and pmo.valid and pmo.player and pmo.player.valid
     and pmo.player.pairmod and pmo.player.pairmod.pair
-    and mo and mo.valid and mo.target and mo.target.valid
+    and mo.target and mo.target.valid
     and pmo.player.pairmod.pair == mo.target.player then
         return false
     end

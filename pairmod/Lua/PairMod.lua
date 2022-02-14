@@ -40,7 +40,9 @@ freeslot(
     "S_INVINCGATE", "MT_INVINCGATE",
     "S_GROWGATE", "MT_GROWGATE",
     "S_HYUDOROGATE", "MT_HYUDOROGATE",
-    "S_SPBNUMBER_1", "S_SPBNUMBER_2", "S_SPBNUMBER_3", "S_SPBNUMBER_4", "S_SPBNUMBER_5", "MT_PAIRMOD_SPBNUMBERS"
+    "S_SPBNUMBER_1", "S_SPBNUMBER_2", "S_SPBNUMBER_3", "S_SPBNUMBER_4", "S_SPBNUMBER_5", "MT_PAIRMOD_SPBNUMBERS",
+
+    "S_PAIRMOD_THUNDERSPARK", "MT_PAIRMOD_THUNDERSPARK"
 )
 
 
@@ -133,6 +135,15 @@ mobjinfo[MT_PAIRMOD_SPBNUMBERS] = {
     flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
 }
 
+states[S_PAIRMOD_THUNDERSPARK] = {SPR_KSPK, A|FF_ANIMATE, -1, nil, 3, 6, S_PAIRMOD_THUNDERSPARK}
+mobjinfo[MT_PAIRMOD_THUNDERSPARK] = {
+    spawnstate = S_PAIRMOD_THUNDERSPARK,
+    spawnhealth = 1000,
+    radius = 4*FRACUNIT,
+    height = 8*FRACUNIT,
+    flags = MF_NOBLOCKMAP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_DONTENCOREMAP,
+}
+
 --## Rawsets ##--
 rawset(_G, "pairmod", {})
 
@@ -184,6 +195,7 @@ local function resetVars(p)
         gatechainreset = 0,
         teamid = nil,
         alreadyDidExit = false,
+        thundershieldInvul = 0,
     }
 end
 
@@ -402,6 +414,52 @@ local function spawnGate(p, gatetype)
         gate.flags2 = $|MF2_DONTDRAW
         return gate
     end
+end
+
+-- doThunderShield is not exposed to lua so ima have to expose it myself...
+-- https://git.do.srb2.org/KartKrew/Kart-Public/-/blob/master/src/k_kart.c#L3415
+local THUNDERRADIUS = 320
+local function doTeamThunderShield(otherp)
+    local p = otherp.pairmod.pair
+
+	S_StartSound(p.mo, sfx_zio3)
+	P_NukeEnemies(p.mo, p.mo, RING_DIST/4)
+
+	-- spawn vertical bolt
+	local mobolt1 = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
+	mobolt1.target = p.mo
+	mobolt1.state = S_LZIO11
+	mobolt1.color = SKINCOLOR_TEAL
+	mobolt1.scale = p.mo.scale*3 + (p.mo.scale/2)
+
+	local mobolt2 = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
+	mobolt2.target = p.mo
+	mobolt2.state = S_LZIO21
+	mobolt2.color = SKINCOLOR_CYAN
+	mobolt2.scale = p.mo.scale*3 + (p.mo.scale/2)
+
+	-- spawn horizontal bolts
+	for i = 0, 6 do
+		local mo = P_SpawnMobj(p.mo.x, p.mo.y, p.mo.z, MT_THOK)
+		mo.angle = P_RandomRange(0, 359)*ANG1
+		mo.fuse = P_RandomRange(20, 50)
+		mo.target = p.mo
+		mo.state = S_KLIT1
+    end
+
+	-- spawn the radius thing:
+	local an = ANGLE_22h
+	for i = 0, 14 do
+		local sx = p.mo.x + FixedMul(p.mo.scale * THUNDERRADIUS, cos(an * i))
+		local sy = p.mo.y + FixedMul(p.mo.scale * THUNDERRADIUS, sin(an * i))
+		local mo = P_SpawnMobj(sx, sy, p.mo.z, MT_THOK)
+		mo.angle = an * i
+		mo.extravalue1 = THUNDERRADIUS -- Used to know whether we should teleport by radius or something.
+		mo.scale = p.mo.scale * 3
+		mo.target = p.mo
+		mo.state = S_KSPARK1
+    end
+
 end
 
 local function spawnMaxRangeIndicator(p, i)
@@ -762,6 +820,34 @@ local function doGateSpawning(p)
     end
 end
 
+local function doThunderShieldCheck(p)
+    local pm = p.pairmod
+
+    -- Thunder shield
+    if p.cmd.buttons & BT_ATTACK and not (pm.lastbtn & BT_ATTACK)
+    and pm.lastitemtype == KITEM_THUNDERSHIELD
+    and pm.lastitemamount == p.kartstuff[k_itemamount] + 1
+    and not p.kartstuff[k_stolentimer] then
+        p.pairmod.thundershieldInvul = 1
+        p.pairmod.pair.pairmod.thundershieldInvul = 1
+        doTeamThunderShield(p)
+    end
+
+    if p.kartstuff[k_itemtype] == KITEM_THUNDERSHIELD and p.kartstuff[k_itemamount] > 0 then
+        local pair = p.pairmod.pair
+        local spark = P_SpawnMobj(pair.mo.x, pair.mo.y, pair.mo.z, MT_SUPERSPARK)
+
+        local ang = FixedAngle(P_RandomRange(0, 359) * FRACUNIT)
+
+        spark.scale = $ / 2
+        spark.momx = cos(ang) * 4
+        spark.momy = sin(ang) * 4
+        spark.momz = 3 * P_RandomFixed()
+    end
+
+    p.pairmod.thundershieldInvul = max($ - 1, 0)
+end
+
 local function doGateChainTimer(p)
     local pm = p.pairmod
 
@@ -857,6 +943,8 @@ local function playerThinker(p)
     and not pm.pair.spectator) then return end
 
     doGateSpawning(p)
+
+    doThunderShieldCheck(p)
 
     doGateChainTimer(p)
 
@@ -1219,6 +1307,13 @@ for _, k in ipairs(ITEM_DONT_COLLIDE_APPLIED) do
 end
 addHook("ShouldDamage", itemShouldDamange, MT_PLAYER)
 
+-- This is an extremely dirty hack and I expect this to eventually break somewhere
+-- but it makes thunder shields not do team damage so yay.
+addHook("PlayerSpin", function (p, inf, src)
+    if inf.valid and inf.type == MT_PLAYER and p.valid and p.pairmod.pair == inf.player and inf == src then
+        return true
+    end
+end)
 
 -- SPB Modifications
 local function SPBMod(mo)

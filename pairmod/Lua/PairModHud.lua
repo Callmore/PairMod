@@ -7,6 +7,9 @@ local ITEMTEXTY = 26
 
 local TEAMMATE_VFLAGS = V_SNAPTOBOTTOM|V_HUDTRANS
 
+-- XItem constant that wasn't exposed
+local XIF_ICONFORAMT = 64
+
 -- Variables
 local playerfacesgfx = {}
 local miniitemgfx
@@ -65,9 +68,13 @@ end
 addHook("ThinkFrame", getScoreboard)
 
 -- Functions
-local function getItemPatchName(itemId)
+local function getItemPatchName(itemId, amount)
     if xItemLib then
-        return xItemLib.func.getSinglePatch(itemId, true, true)
+        local item = xItemLib.func.getItemDataById(itemId)
+        if item.flags & XIF_ICONFORAMT then
+            return item.getItemPatchSingle(true, amount)
+        end
+        return item.getItemPatchSingle(true, leveltime)
     end
     if itemId == KITEM_INVINCIBILITY then
         --inv is shiny

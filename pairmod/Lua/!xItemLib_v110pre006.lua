@@ -9,7 +9,7 @@
 --current library version (release, major, minor)
 local currLibVer = 110
 --current library revision (internal testing use)
-local currRevVer = 1
+local currRevVer = 6
 
 --item flags, people making custom items can copy/paste this over to their lua scripts
 local XIF_POWERITEM = 1 --is power item (affects final odds)
@@ -98,6 +98,7 @@ local availableItems = {{}, {}, {}, {}}
 local debuggerDistributions = {it = {}, odds = {}, totalodds = 0, useodds = 0}
 
 local function findSplitPlayerNum(p)
+	if not p then return end
 	local splitplaynum = 0
 	local si = 1
 	for dp in displayplayers.iterate do
@@ -235,7 +236,7 @@ local function ClassXItem(num, namespace, iName, bigpatch, smallpatch, flags, ra
 	--set item dropped sprite
 	local itemSprite = {}
 	if not droppedstate then
-		return {tics = 0, pics = {{SPR_ITEM, 0}}}
+		itemSprite = {tics = 0, pics = {{SPR_ITEM, 0}}}
 	end
 	if type(droppedstate) == "number" then
 		itemSprite.tics = 0
@@ -408,9 +409,13 @@ local function findItemByFriendlyName(name, ignoreErrs)
 	end
 end
 
+local dat
 --item ID 0 will fully reset all odds
 local function resetOddsForItem(item, p, battle)
-	local dat = p.xItemData
+	if not p then return end
+	if not p.xItemData then return end
+	dat = p.xItemData
+
 	if item == 0 then
 		dat.xItem_battleOdds = nil
 		dat.xItem_raceOdds = nil
@@ -434,7 +439,10 @@ local function resetOddsForItem(item, p, battle)
 end
 
 local function setPlayerOddsForItem(item, p, raceOdds, battleOdds)
-	local dat = p.xItemData
+	if not p then return end
+	if not p.xItemData then return end
+	dat = p.xItemData
+
 	if raceOdds then
 		if not dat.xItem_raceOdds then
 			dat.xItem_raceOdds = {}
@@ -474,6 +482,7 @@ local function checkPowerItemOdds(odds, mashed, spbrush, playersInGame)
 end
 
 local function floatingItemThinker(mo)
+	if not (mo and mo.valid) then return end
 	local f = P_SpawnMobj(mo.x, mo.y, mo.z, MT_FLOATINGXITEM)
 	f.momx = mo.momx
 	f.momy = mo.momy
@@ -490,11 +499,12 @@ end
 
 local function floatingItemSpecial(s, t)
 	--if t.player and t.player.xItemData and (t.player.xItemData.xItem_roulette or t.player.xItemData.xItem_itemSlotLocked) then
-		return true
+	return true
 	--end
 end
 
 local function floatingXItemThinker(mo)
+	if not (mo and mo.valid) then return end
 	if (mo.flags & MF_NOCLIPTHING) then
 		if (P_CheckDeathPitCollide(mo)) then
 			P_RemoveMobj(mo)
@@ -544,8 +554,8 @@ local function floatingXItemThinker(mo)
 	end
 	
 	--crossmod "hooks"
-	for j = 1, #libdat.xItemModNamespaces do
-		local fn = libfunc.getXItemModValue(j, item, "droppedfunc")
+	for j = 1, #xItemLib.xItemModNamespaces do
+		local fn = xItemLib.func.getXItemModValue(j, item, "droppedfunc")
 		if fn == nil or (not type(fn) == "function") then continue end
 		local status, err = pcall(fn, mo, i, amt)
 		if not status then
@@ -706,7 +716,7 @@ local function vanillaArrowThinker(mo)
 end
 
 local function playerArrowThinker(mobj)
-    if mobj.target and mobj.target.health
+    if mobj and mobj.valid and mobj.target and mobj.target.health
         and mobj.target.player and not mobj.target.player.spectator
         and mobj.target.player.health and mobj.target.player.playerstate ~= PST_DEAD
         --[[and displayplayers[0].mo and not displayplayers[0].spectator]]
@@ -891,6 +901,8 @@ end
 
 --odds functions start
 local function xItem_GetItemResult(p, getitem, onlyReturn, skipGetFunc)
+	if not p then return end
+
 	local libdat = xItemLib
 	local libfn = libdat.func
 	local it = libfn.getItemDataById(getitem)
@@ -949,7 +961,10 @@ local function xItem_GetOdds(pos, item, mashed, spbrush, p, custTable)
 	local libfn = xItemLib.func
 	local itdat = libfn.getItemDataById(item)
 	local kartstuff = p.kartstuff
-	local pdat = p.xItemData
+
+	if not p then return end
+	if not p.xItemData then return end
+	dat = p.xItemData
 	
 	
 	local itemenabled = {
@@ -982,14 +997,14 @@ local function xItem_GetOdds(pos, item, mashed, spbrush, p, custTable)
 	if custTable then
 		if (not custTable[item]) or (not custTable[item][pos]) then
 			if (G_BattleGametype()) then
-				if pdat.xItem_battleOdds and pdat.xItem_battleOdds[item] then
-					newodds = pdat.xItem_battleOdds[item][pos]
+				if dat.xItem_battleOdds and dat.xItem_battleOdds[item] then
+					newodds = dat.xItem_battleOdds[item][pos]
 				else
 					newodds = xItemLib.xItemOddsBattle[item][pos]
 				end
 			else
-				if pdat.xItem_raceOdds and pdat.xItem_raceOdds[item] then
-					newodds = pdat.xItem_raceOdds[item][pos]
+				if dat.xItem_raceOdds and dat.xItem_raceOdds[item] then
+					newodds = dat.xItem_raceOdds[item][pos]
 				else
 					newodds = xItemLib.xItemOddsRace[item][pos]
 				end
@@ -999,14 +1014,14 @@ local function xItem_GetOdds(pos, item, mashed, spbrush, p, custTable)
 		end
 	else
 		if (G_BattleGametype()) then
-			if pdat.xItem_battleOdds and pdat.xItem_battleOdds[item] then
-				newodds = pdat.xItem_battleOdds[item][pos]
+			if dat.xItem_battleOdds and dat.xItem_battleOdds[item] then
+				newodds = dat.xItem_battleOdds[item][pos]
 			else
 				newodds = xItemLib.xItemOddsBattle[item][pos]
 			end
 		else
-			if pdat.xItem_raceOdds and pdat.xItem_raceOdds[item] then
-				newodds = pdat.xItem_raceOdds[item][pos]
+			if dat.xItem_raceOdds and dat.xItem_raceOdds[item] then
+				newodds = dat.xItem_raceOdds[item][pos]
 			else
 				newodds = xItemLib.xItemOddsRace[item][pos]
 			end
@@ -1110,6 +1125,8 @@ local function setupDistTable(odds, num, disttable, distlen)
 end
 
 local function xItem_FindUseOdds(p, mashed, pingame, spbrush, dontforcespb)
+	if not p then return end
+
 	local distvar = 64*14
 	local i
 	local pdis = 0
@@ -1216,6 +1233,10 @@ local function xItem_FindUseOdds(p, mashed, pingame, spbrush, dontforcespb)
 end
 
 local function xItem_ItemRoulette(p, cmd)
+	if not p then return end
+	if not p.xItemData then return end
+	dat = p.xItemData
+
 	local i
 	local pingame = 0
 	local roulettestop
@@ -1228,21 +1249,20 @@ local function xItem_ItemRoulette(p, cmd)
 	local spbrush = false
 	
 	local kartstuff = p.kartstuff
-	local pdat = p.xItemData
 	local libdat = xItemLib
 	local libfn = libdat.func
 	
 	if leveltime == 0 then
-		pdat.xItem_roulette = 0
+		dat.xItem_roulette = 0
 		libfn.resetItemOdds(0, p)
 	end
 	--stripped during roulette clears our fake one
-	if pdat.xItem_roulette and kartstuff[k_itemroulette] == 0 then
-		pdat.xItem_roulette = 0
+	if dat.xItem_roulette and kartstuff[k_itemroulette] == 0 then
+		dat.xItem_roulette = 0
 		kartstuff[k_roulettetype] = 0
 	end
-	if kartstuff[k_itemroulette] and pdat.xItem_roulette == 0 then
-		pdat.xItem_roulette = kartstuff[k_itemroulette]
+	if kartstuff[k_itemroulette] and dat.xItem_roulette == 0 then
+		dat.xItem_roulette = kartstuff[k_itemroulette]
 		kartstuff[k_itemroulette] = 4
 
 		for i = 1, #libdat.xItemModNamespaces do
@@ -1254,24 +1274,24 @@ local function xItem_ItemRoulette(p, cmd)
 			end
 		end
 
-		if pdat.xItem_resetOddsNextRoll == -1 then
+		if dat.xItem_resetOddsNextRoll == -1 then
 			libfn.resetItemOdds(0, p)
-			pdat.xItem_resetOddsNextRoll = 0
+			dat.xItem_resetOddsNextRoll = 0
 		end
 	end
 	if kartstuff[k_itemroulette] and kartstuff[k_itemroulette] < 4 and (kartstuff[k_roulettetype] == 2) then
-		pdat.xItem_roulette = kartstuff[k_itemroulette]
+		dat.xItem_roulette = kartstuff[k_itemroulette]
 		kartstuff[k_itemroulette] = 4
 		kartstuff[k_roulettetype] = 2
-		if pdat.xItem_resetOddsNextRoll == -1 then
+		if dat.xItem_resetOddsNextRoll == -1 then
 			libfn.resetItemOdds(0, p)
-			pdat.xItem_resetOddsNextRoll = 0
+			dat.xItem_resetOddsNextRoll = 0
 		end
 	end
 	
-	if pdat.xItem_roulette then
+	if dat.xItem_roulette then
 		kartstuff[k_itemroulette] = 4
-		pdat.xItem_roulette = $+1
+		dat.xItem_roulette = $+1
 	else
 		return
 	end
@@ -1294,8 +1314,8 @@ local function xItem_ItemRoulette(p, cmd)
 
 	
 	-- This makes the roulette produce the random noises.
-	if P_IsLocalPlayer(p) and pdat.xItem_roulette % 3 == 1 then
-		S_StartSound(nil, sfx_itrol1 + ((pdat.xItem_roulette / 3) % 8), p)
+	if P_IsLocalPlayer(p) and dat.xItem_roulette % 3 == 1 then
+		S_StartSound(nil, sfx_itrol1 + ((dat.xItem_roulette / 3) % 8), p)
 	end
 	
 	roulettestop = TICRATE + (3*(pingame - kartstuff[k_position]))
@@ -1304,15 +1324,15 @@ local function xItem_ItemRoulette(p, cmd)
 	end
 	
 	local splitplaynum = p.splitscreenindex + 1
-	if P_IsLocalPlayer(p) and ((pdat.xItem_roulette < 4) or (pdat.xItem_roulette % 3 == 0)) then
+	if P_IsLocalPlayer(p) and ((dat.xItem_roulette < 4) or (dat.xItem_roulette % 3 == 0)) then
 		useodds = libfn.findUseOdds(p, 0, pingame, spbrush, dontforcespb)
 		availableItems[splitplaynum] = libfn.hudFindRouletteItems(p, useodds, 0, spbrush)
 	end
 	
-	if (((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED)) and not (kartstuff[k_eggmanheld] or kartstuff[k_itemheld]) and pdat.xItem_roulette >= roulettestop and not modeattacking) then
+	if (((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED)) and not (kartstuff[k_eggmanheld] or kartstuff[k_itemheld]) and dat.xItem_roulette >= roulettestop and not modeattacking) then
 		-- Mashing reduces your chances for the good items
-		mashed = FixedDiv(pdat.xItem_roulette*FRACUNIT, ((TICRATE*3)+roulettestop)*FRACUNIT) - FRACUNIT
-	elseif (not(pdat.xItem_roulette >= (TICRATE*3))) then
+		mashed = FixedDiv(dat.xItem_roulette*FRACUNIT, ((TICRATE*3)+roulettestop)*FRACUNIT) - FRACUNIT
+	elseif (not(dat.xItem_roulette >= (TICRATE*3))) then
 		i = nil
 		pingame = nil
 		roulettestop = nil
@@ -1331,10 +1351,10 @@ local function xItem_ItemRoulette(p, cmd)
 		kartstuff[k_eggmanexplode] = max($, 4*TICRATE) --in case this runs after stuff like egg panic
 		
 		S_StartSound(nil, sfx_itrole, p)
-		pdat.xItem_itemSlotLocked = false --just in case
-		if pdat.xItem_resetOddsNextRoll == 1 then
+		dat.xItem_itemSlotLocked = false --just in case
+		if dat.xItem_resetOddsNextRoll == 1 then
 			libfn.resetItemOdds(0, p)
-			pdat.xItem_resetOddsNextRoll = 0
+			dat.xItem_resetOddsNextRoll = 0
 		end
 
 		for i = 1, #libdat.xItemModNamespaces do
@@ -1347,7 +1367,7 @@ local function xItem_ItemRoulette(p, cmd)
 		end
 
 		kartstuff[k_itemroulette] = 0
-		pdat.xItem_roulette = 0
+		dat.xItem_roulette = 0
 		kartstuff[k_roulettetype] = 0
 		
 		i = nil
@@ -1369,9 +1389,9 @@ local function xItem_ItemRoulette(p, cmd)
 		kartstuff[k_itemamount] = libdat.cvars.dItemDebugAmt.value
 		
 		S_StartSound(nil, sfx_dbgsal, p)
-		if pdat.xItem_resetOddsNextRoll == 1 then
+		if dat.xItem_resetOddsNextRoll == 1 then
 			libfn.resetItemOdds(0, p)
-			pdat.xItem_resetOddsNextRoll = 0
+			dat.xItem_resetOddsNextRoll = 0
 		end
 
 		for i = 1, #libdat.xItemModNamespaces do
@@ -1385,7 +1405,7 @@ local function xItem_ItemRoulette(p, cmd)
 		kartstuff[k_itemblink] = TICRATE
 		kartstuff[k_itemblinkmode] = 2
 		kartstuff[k_itemroulette] = 0
-		pdat.xItem_roulette = 0
+		dat.xItem_roulette = 0
 		kartstuff[k_roulettetype] = 0
 		
 		di = nil
@@ -1435,9 +1455,9 @@ local function xItem_ItemRoulette(p, cmd)
 		kartstuff[k_itemamount] = 1
 	end
 	
-	if pdat.xItem_resetOddsNextRoll == 1 then
+	if dat.xItem_resetOddsNextRoll == 1 then
 		libfn.resetItemOdds(0, p)
-		pdat.xItem_resetOddsNextRoll = 0
+		dat.xItem_resetOddsNextRoll = 0
 	end
 	
 	S_StartSound(nil, ((kartstuff[k_roulettetype] == 1) and sfx_itrolk or (mashed and sfx_itrolm or sfx_itrolf)), p)
@@ -1446,7 +1466,7 @@ local function xItem_ItemRoulette(p, cmd)
 	kartstuff[k_itemblinkmode] = ((kartstuff[k_roulettetype] == 1) and 2 or (mashed and 1 or 0))
 	
 	kartstuff[k_itemroulette] = 0
-	pdat.xItem_roulette = 0  --Since we're done, clear the roulette number
+	dat.xItem_roulette = 0  --Since we're done, clear the roulette number
 	kartstuff[k_roulettetype] = 0 --This too
 	
 	i = nil
@@ -1461,6 +1481,8 @@ local function xItem_ItemRoulette(p, cmd)
 end
 
 local function xItem_handleDistributionDebugger(pa)
+	if not pa then return end
+
 	local libdat = xItemLib
 	local libfn = libdat.func
 	if libdat.cvars.bItemDebugDistrib.value and P_IsLocalPlayer(pa) and (pa == consoleplayer) then
@@ -1472,6 +1494,7 @@ local function xItem_handleDistributionDebugger(pa)
 
 		for p in players.iterate do
 			if p.spectator then continue end
+			if not p then continue end
 			pingame = $+1
 			if (p.exiting) then
 				dontforcespb = true
@@ -1499,6 +1522,8 @@ local function canUseItem(p)
 end
 
 local function playerCmdHook(p, cmd)
+	if not p then return end
+
 	if p.xItemData and p.xItemData.xItem_itemSlotLockedTimer then
 		if cmd.buttons & BT_ATTACK then
 			cmd.buttons = ($|XBT_ATTACKDISABLED) & ~BT_ATTACK
@@ -1522,7 +1547,10 @@ local function setPlayerItemCooldown(p, time, force)
 end
 
 local function xItem_BasicItemHandler(p, cmd)
-	local pdat = p.xItemData
+	if not p then return end
+	if not p.xItemData then return end
+	dat = p.xItemData
+
 	local kartstuff = p.kartstuff
 	
 	local libdat = xItemLib
@@ -1532,16 +1560,16 @@ local function xItem_BasicItemHandler(p, cmd)
 	local itdat = libfunc.getItemDataById(item)
 	local canUseItem = libfunc.canUseItem
 	
-	local attackJustDown = (((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED)) and pdat.xItem_pressedUse == 0)
+	local attackJustDown = (((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED)) and dat.xItem_pressedUse == 0)
 	local attackDown = ((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED))
-	local attackReleased = ((pdat.xItem_pressedUse) and not ((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED)))
+	local attackReleased = ((dat.xItem_pressedUse) and not ((cmd.buttons & BT_ATTACK) or (cmd.buttons & XBT_ATTACKDISABLED)))
 	local noHyudoro = (p.kartstuff[k_stolentimer] == 0 and p.kartstuff[k_stealingtimer] == 0)
 	
 	local status, err
 	if itdat and itdat.preusefunc then
 		if canUseItem(p) and noHyudoro then
 			if attackDown then
-				status, err = pcall(itdat.preusefunc, p, cmd, pdat.xItem_pressedUse, attackJustDown)
+				status, err = pcall(itdat.preusefunc, p, cmd, dat.xItem_pressedUse, attackJustDown)
 				if not status then
 					error(err, 2)
 				end
@@ -1550,7 +1578,7 @@ local function xItem_BasicItemHandler(p, cmd)
 				for i = 1, #libdat.xItemModNamespaces do
 					local fn = libfunc.getXItemModValue(i, item, "preusefunc")
 					if fn == nil or (not type(fn) == "function") then continue end
-					local status, err = pcall(fn, p, cmd, pdat.xItem_pressedUse, attackJustDown)
+					local status, err = pcall(fn, p, cmd, dat.xItem_pressedUse, attackJustDown)
 					if not status then
 						error(err, 2)
 					end
@@ -1564,7 +1592,7 @@ local function xItem_BasicItemHandler(p, cmd)
 					end
 				end
 				if itdat.flags and (itdat.flags & XIF_LOCKONUSE == XIF_LOCKONUSE) then
-					pdat.xItem_itemSlotLocked = true
+					dat.xItem_itemSlotLocked = true
 				end
 				--crossmod "hooks"
 				for i = 1, #libdat.xItemModNamespaces do
@@ -1581,7 +1609,7 @@ local function xItem_BasicItemHandler(p, cmd)
 		if itdat and canUseItem(p) and attackJustDown and noHyudoro then
 			--print("using item "..item)
 			if itdat.flags and (itdat.flags & XIF_LOCKONUSE == XIF_LOCKONUSE) then
-				pdat.xItem_itemSlotLocked = true
+				dat.xItem_itemSlotLocked = true
 			end
 			if itdat and itdat.usefunc then
 				--print("has a function")
@@ -1602,25 +1630,25 @@ local function xItem_BasicItemHandler(p, cmd)
 		end
 	end
 	
-	if attackDown and (pdat.xItem_roulette > 0 or p.kartstuff[k_respawn] ~= 0) then
-		pdat.xItem_attackedDuringRoll = true
+	if attackDown and (dat.xItem_roulette > 0 or p.kartstuff[k_respawn] ~= 0) then
+		dat.xItem_attackedDuringRoll = true
 	end
-	if (not attackDown) and pdat.xItem_roulette == 0 and p.kartstuff[k_respawn] == 0 and pdat.xItem_attackedDuringRoll then
-		pdat.xItem_attackedDuringRoll = false
+	if (not attackDown) and dat.xItem_roulette == 0 and p.kartstuff[k_respawn] == 0 and dat.xItem_attackedDuringRoll then
+		dat.xItem_attackedDuringRoll = false
 	end
 	p.findwaypoint, p.racebot = nil, nil
 
-	if ((pdat.xItem_pressedUse) and not attackDown) then
-		pdat.xItem_pressedUse = 0
+	if ((dat.xItem_pressedUse) and not attackDown) then
+		dat.xItem_pressedUse = 0
 	elseif attackDown then
-		pdat.xItem_pressedUse = $+1
+		dat.xItem_pressedUse = $+1
 	end
 
-	if pdat.xItem_itemSlotLockedTimer then
-		pdat.xItem_itemSlotLockedTimer = $ - 1
+	if dat.xItem_itemSlotLockedTimer then
+		dat.xItem_itemSlotLockedTimer = $ - 1
 
-		if pdat.xItem_itemSlotLockedTimer == 0 then
-			pdat.xItem_itemSlotLockedTimerMax = 0
+		if dat.xItem_itemSlotLockedTimer == 0 then
+			dat.xItem_itemSlotLockedTimerMax = 0
 		end
 	end
 end
@@ -1688,14 +1716,15 @@ local function xItem_DrawItemBox(v, p, c, fill)
 end
 
 local function xItem_DrawTimerBar(v, p, c)
+	if not p then return end
 	if not p.xItemData then return end
-	local pdat = p.xItemData
+	dat = p.xItemData
 
 	local fx, fy, fflags = xItemLib.func.hudFindFlags(v, p, c)
 	local kp_itemtimer = {v.cachePatch("K_ITIMER"), v.cachePatch("K_ISIMER")}
 
-	local itembar = pdat.xItem_timerBar
-	local maxitembar = pdat.xItem_maxTimerBar
+	local itembar = dat.xItem_timerBar
+	local maxitembar = dat.xItem_maxTimerBar
 
 	if itembar > 0 then
 		local offset = 1
@@ -1731,22 +1760,25 @@ local function xItem_DrawTimerBar(v, p, c)
 		end
 	end
 
-	pdat.xItem_timerBar = 0
-	pdat.xItem_maxTimerBar = 0
+	dat.xItem_timerBar = 0
+	dat.xItem_maxTimerBar = 0
 end
 
 local function xItem_DrawItemMinecraftCooldown(v, p, c)
-	if leveltime % 2 then return end
+	if not p then return end
 	if not p.xItemData then return end
-	local pdat = p.xItemData
-	if not(pdat.xItem_itemSlotLockedTimer or pdat.xItem_itemSlotLockedTimerMax) then return end
+	dat = p.xItemData
+
+	if leveltime % 2 then return end
+	
+	if not(dat.xItem_itemSlotLockedTimer or dat.xItem_itemSlotLockedTimerMax) then return end
 	local fx, fy, fflags = xItemLib.func.hudFindFlags(v, p, c)
 	local rectTop = 5
 	local rectSize = 40
 	local localbg = {v.cachePatch("K_ITBG"), v.cachePatch("K_ISBG")}
 
-	local itembar = pdat.xItem_itemSlotLockedTimer
-	local maxitembar = pdat.xItem_itemSlotLockedTimerMax
+	local itembar = dat.xItem_itemSlotLockedTimer
+	local maxitembar = dat.xItem_itemSlotLockedTimerMax
 	local length = min(rectSize, ((itembar*rectSize)/maxitembar))
 	
 	if splitscreen < 2 then -- don't change shit for THIS splitscreen.
@@ -1768,6 +1800,9 @@ local function xItem_DrawCooldownItemBox(v, p, c)
 end
 
 local function xItem_DrawItem(v, p, c, i, blink, disableBox)
+	if not p then return end
+	if not p.xItemData then return end
+
 	disableBox = $ or false
 	local fx, fy, fflags, flipamount = xItemLib.func.hudFindFlags(v, p, c)
 	local itTflags = V_HUDTRANS
@@ -1997,9 +2032,13 @@ local function findAvailableRoulettePatches(p, useodds, spbrush)
 end
 
 local function xItem_hudMain(v, p, c)
+	if not p then return end
+	if not p.xItemData then return end
+	dat = p.xItemData
+
 	local libdat = xItemLib
 	local libfn = libdat.func
-	local playerdat = p.xItemData
+	local dat = p.xItemData
 	
 	hud.disable("item")
 
@@ -2015,7 +2054,7 @@ local function xItem_hudMain(v, p, c)
 		end
 	end
 
-	if playerdat then
+	if dat then
 		splitplayers[#splitplayers+1] = p
 		local kartstuff = p.kartstuff
 		local itdat = libfn.getItemDataById(kartstuff[k_itemtype])
@@ -2030,13 +2069,13 @@ local function xItem_hudMain(v, p, c)
 				libfn.hudDrawEgg(v, p, c)
 			elseif kartstuff[k_rocketsneakertimer] then
 				libfn.hudDrawItem(v, p, c, 2, 2)
-				playerdat.xItem_timerBar = kartstuff[k_rocketsneakertimer]
-				playerdat.xItem_maxTimerBar = 8*3*TICRATE
+				dat.xItem_timerBar = kartstuff[k_rocketsneakertimer]
+				dat.xItem_maxTimerBar = 8*3*TICRATE
 			elseif kartstuff[k_growshrinktimer] > 0 then
 				libfn.hudDrawItem(v, p, c, 11, 2)
 				if kartstuff[k_growcancel] > 0 then
-					playerdat.xItem_timerBar = kartstuff[k_growcancel]
-					playerdat.xItem_maxTimerBar = 26
+					dat.xItem_timerBar = kartstuff[k_growcancel]
+					dat.xItem_maxTimerBar = 26
 				end
 			elseif kartstuff[k_sadtimer] or kartstuff[k_itemtype] == -1 then
 				libfn.hudDrawItem(v, p, c, 0, -1)
@@ -2044,7 +2083,7 @@ local function xItem_hudMain(v, p, c)
 					libfn.hudDrawSad(v, p, c)
 				end
 			--draw the roulette
-			elseif playerdat.xItem_roulette then
+			elseif dat.xItem_roulette then
 				local av = availableItems[p.splitscreenindex + 1]
 				--print(splitnum(p))
 				if av and table.maxn(av) then
@@ -2062,7 +2101,7 @@ local function xItem_hudMain(v, p, c)
 						libfn.hudDrawItem(v, p, c, kartstuff[k_itemtype])
 					end
 				end
-			elseif playerdat.xItem_itemSlotLockedTimer then
+			elseif dat.xItem_itemSlotLockedTimer then
 				libfn.hudDrawItemCooldownBox(v, p, c)
 			end
 			--crossmod "hooks"

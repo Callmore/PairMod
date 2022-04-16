@@ -197,6 +197,7 @@ local function resetVars(p)
         alreadyDidExit = false,
         thundershieldInvul = 0,
     }
+    p.pm_itemoddsset = false
 end
 
 local function copyLatent(p)
@@ -1022,6 +1023,13 @@ local function intThink()
     end
 end
 addHook("IntermissionThinker", intThink)
+
+local function onRespawn(pmo)
+    if pmo and pmo.valid and pmo.player and pmo.player.valid then
+        setItemOddsForPlayer(pmo.player)
+    end
+end
+addHook("MobjSpawn", onRespawn, MT_PLAYER)
 
 -- Object thinkers
 

@@ -738,8 +738,6 @@ local function checkAndDoPlayerFinish(p)
     if not p.exiting and p.pflags & PF_TIMEOVER == 0 then return false end
     if pm.alreadyDidExit then return true end
     
-    --recordScore(p)
-    
     pm.alreadyDidExit = true
     return true
 end
@@ -920,6 +918,23 @@ local function forceTeamColour(p)
     end
 end
 
+local function setItemOddsForPlayer(p)
+    for item, odds in pairs(PAIRMOD_CUSTOM_ITEM_ODDS) do
+        xItemLib.func.setPlayerOddsForItem(item, p, odds)
+    end
+    p.pm_itemoddsset = true
+end
+
+local function removeItemOdds()
+    for p in players.iterate do
+        -- p should always be valid here if it's not then thats mega dumb...
+        if p.pm_itemoddsset then
+            xItemLib.func.resetItemOdds(0, p)
+            p.pm_itemoddsset = false
+        end
+    end
+end
+
 local function playerThinker(p)
     if not p.pairmod then
         resetVars(p)
@@ -929,6 +944,10 @@ local function playerThinker(p)
 
     if p.spectator then
         return
+    end
+
+    if not p.pm_itemoddsset then
+        setItemOddsForPlayer(p)
     end
 
     if checkAndDoPlayerFinish(p) then return end
@@ -970,6 +989,7 @@ local function think()
     end
 
     if not pairmod.running then
+        removeItemOdds()
         return
     end
 
@@ -1317,7 +1337,14 @@ end)
 
 -- SPB Modifications
 local function SPBMod(mo)
-    --print(FixedInt(mo.movefactor))
+    if not pairmod.running then
+        return
+    end
+
+    -- It's a blue shell make it blue ffs
+    mo.color = SKINCOLOR_BLUE
+    mo.colorized = true
+
     if mo.extravalue1 == 1 then
         mo.pairmod_spbTimer = ($ + 1) or 0
 
@@ -1333,7 +1360,6 @@ local function SPBMod(mo)
         end
 
         if mo.pairmod_spbTimer >= 8*TICRATE then
-            mo.colorized = true
             mo.momx = FixedMul($, 3*FRACUNIT/2)
             mo.momy = FixedMul($, 3*FRACUNIT/2)
             mo.momz = FixedMul($, 3*FRACUNIT/2)

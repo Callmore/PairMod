@@ -2,5 +2,5 @@
     "files.exclude": {
         "**/.git": true,
     },
-    
+    "todo-tree.regex.regex": "(//|#|<!--|;|/\\*|^|^[ \\t]*(-|\\d+.)|--)\\s*($TAGS)"
 }
